@@ -427,46 +427,109 @@ const usuariosSistema = [
 ];
 
 async function carregarDadosSalvos(){
+  let supaDados=null, supaTs=0;
   try{
-    const { data, error } = await sb.from('estado_sistema').select('dados').eq('id', ESTADO_ID).maybeSingle();
+    const { data, error } = await sb.from('estado_sistema')
+      .select('dados, atualizado_em').eq('id', ESTADO_ID).maybeSingle();
     if(error) throw error;
-    if(data && data.dados){
-      const saved = data.dados;
-      if(saved.quotes) quotes = saved.quotes;
-      if(saved.serviceOrders) serviceOrders = saved.serviceOrders;
-      if(saved.clients) clients = saved.clients;
-      if(saved.finance) finance = saved.finance;
-      if(saved.funcionarios) funcionarios = saved.funcionarios;
-      if(saved.servicosConcluidos) servicosConcluidos = saved.servicosConcluidos;
-      if(saved.entradas) entradas = saved.entradas;
-      if(saved.saidas) saidas = saved.saidas;
-    } else {
-      // Banco ainda vazio: grava os dados atuais em memória como estado inicial.
-      await enviarParaSupabase();
-    }
+    if(data && data.dados){ supaDados=data.dados; supaTs=Date.parse(data.atualizado_em)||0; }
   }catch(e){
     console.error('Erro ao carregar do Supabase:', e);
-    alert('Não foi possível carregar os dados do servidor. Verifique sua conexão e recarregue a página.');
+    mostrarStatus('err','Sem conexão com o servidor. Usando a cópia local, se houver.');
+  }
+
+  // Cópia de segurança local: protege contra salvamentos que não chegaram ao servidor.
+  let localBkp=null;
+  try{ localBkp=JSON.parse(localStorage.getItem('dubis_backup')||'null'); }catch(e){}
+
+  let usar=null, precisaReenviar=false;
+  if(localBkp && localBkp.dados && localBkp.ts > supaTs + 2000){
+    usar = localBkp.dados; precisaReenviar=true; // local é mais novo => recupera e reenvia
+  } else if(supaDados){
+    usar = supaDados;
+  } else if(localBkp && localBkp.dados){
+    usar = localBkp.dados;
+  }
+
+  if(usar){
+    if(usar.quotes) quotes = usar.quotes;
+    if(usar.serviceOrders) serviceOrders = usar.serviceOrders;
+    if(usar.clients) clients = usar.clients;
+    if(usar.finance) finance = usar.finance;
+    if(usar.funcionarios) funcionarios = usar.funcionarios;
+    if(usar.servicosConcluidos) servicosConcluidos = usar.servicosConcluidos;
+    if(usar.entradas) entradas = usar.entradas;
+    if(usar.saidas) saidas = usar.saidas;
+    if(precisaReenviar){ await enviarParaSupabase(); }
+  } else if(!supaDados){
+    await enviarParaSupabase(); // nada no servidor nem local: grava o estado atual como inicial
   }
 }
 
-/* salvarDados() é chamada de vários lugares de forma síncrona. Aqui ela apenas
-   agenda o envio (com debounce) para não bombardear o servidor a cada clique. */
-let _salvarTimer=null;
+/* ===== Salvamento com aviso visível + cópia de segurança local ===== */
+function _coletarDados(){
+  return {quotes, serviceOrders, clients, finance, entradas, saidas, funcionarios, servicosConcluidos};
+}
+function _salvarBackupLocal(dados, ts){
+  try{ localStorage.setItem('dubis_backup', JSON.stringify({dados, ts})); }catch(e){}
+}
+
+// Indicador visual no canto da tela
+function mostrarStatus(tipo, msg){
+  let el=document.getElementById('salvarStatus');
+  if(!el){
+    el=document.createElement('div');
+    el.id='salvarStatus';
+    el.style.cssText='position:fixed;bottom:18px;right:18px;z-index:99999;padding:10px 16px;border-radius:10px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .3s;max-width:340px';
+    document.body.appendChild(el);
+  }
+  clearTimeout(el._t); el.style.opacity='1';
+  if(tipo==='saving'){ el.style.background='#fef3c7'; el.style.color='#92400e'; el.innerText='Salvando...'; }
+  else if(tipo==='ok'){ el.style.background='#dcfce7'; el.style.color='#166534'; el.innerText='\u2713 Salvo'; el._t=setTimeout(()=>{el.style.opacity='0';},1600); }
+  else { el.style.background='#fee2e2'; el.style.color='#991b1b'; el.innerText='\u26a0 '+(msg||'N\u00e3o foi poss\u00edvel salvar. Verifique sua internet e tente de novo.'); }
+}
+
+let _salvarTimer=null, _temPendencia=false;
 function salvarDados(){
+  _salvarBackupLocal(_coletarDados(), Date.now()); // cópia local imediata (não se perde)
+  _temPendencia=true;
+  mostrarStatus('saving');
   clearTimeout(_salvarTimer);
   _salvarTimer = setTimeout(enviarParaSupabase, 500);
 }
+
+// Salvamento imediato e aguardado, para ações importantes (novo orçamento, etc.)
+async function salvarAgora(){
+  clearTimeout(_salvarTimer);
+  mostrarStatus('saving');
+  _salvarBackupLocal(_coletarDados(), Date.now());
+  _temPendencia=true;
+  return await enviarParaSupabase();
+}
+
 async function enviarParaSupabase(){
+  const ts=Date.now();
+  const dados=_coletarDados();
+  _salvarBackupLocal(dados, ts);
   try{
-    const dados = {quotes, serviceOrders, clients, finance, entradas, saidas, funcionarios, servicosConcluidos};
     const { error } = await sb.from('estado_sistema')
-      .upsert({ id: ESTADO_ID, dados, atualizado_em: new Date().toISOString() });
+      .upsert({ id: ESTADO_ID, dados, atualizado_em: new Date(ts).toISOString() });
     if(error) throw error;
+    _temPendencia=false;
+    mostrarStatus('ok');
+    return true;
   }catch(e){
     console.error('Erro ao salvar no Supabase:', e);
+    mostrarStatus('err'); // aviso vermelho permanece na tela até salvar de novo
+    return false;
   }
 }
+
+// Ao trocar de aba ou fechar: tenta enviar o que estiver pendente (a cópia local já protege).
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && _temPendencia){ enviarParaSupabase(); } });
+window.addEventListener('beforeunload', (e)=>{
+  if(_temPendencia){ enviarParaSupabase(); e.preventDefault(); e.returnValue=''; }
+});
 
 function dataHojeISO(){
   return new Date().toISOString().slice(0,10);
@@ -730,7 +793,7 @@ function finalizarOrcamento(){
       os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.items=JSON.parse(JSON.stringify(data.items)); os.total=data.total;
     }
   }
-  formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard(); salvarDados(); salvarDados();
+  formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard(); salvarAgora();
 }
 
 function editarOrcamento(id){
