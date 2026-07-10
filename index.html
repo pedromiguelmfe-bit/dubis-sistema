@@ -111,10 +111,15 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 
 <section id="dashboard" class="section active">
   <div class="cards">
-    <div class="card" onclick="abrirFinanceiroHoje()"><small>Contas para hoje</small><h3 id="dashHojePagar">R$ 0,00</h3></div>
-    <div class="card" onclick="abrirPorId('orcamentos')"><small>Orçamentos do dia</small><h3 id="dashAbertos">0</h3></div>
-    <div class="card" onclick="abrirFinanceiroEntradasHoje()"><small>Renda do dia</small><h3 id="dashRendaDia">R$ 0,00</h3></div>
-    <div class="card" onclick="abrirPorId('financeiro')"><small>A receber</small><h3 id="dashReceber">R$ 0,00</h3></div>
+    <div class="card" onclick="abrirFinanceiroHoje()"><small>Contas para pagar hoje</small><h3 id="dashHojePagar">R$ 0,00</h3></div>
+    <div class="card" onclick="abrirPorId('financeiro')"><small>Contas vencidas</small><h3 id="dashVencidas">R$ 0,00</h3></div>
+    <div class="card" onclick="abrirPorId('financeiro')"><small>Contas pagas (mês)</small><h3 id="dashPagas">R$ 0,00</h3></div>
+    <div class="card" onclick="abrirPorId('orcamentos')"><small>Orçamentos do dia</small><h3 id="dashOrcDia">0</h3></div>
+    <div class="card" onclick="abrirPorId('orcamentos')"><small>Orçamentos em aberto</small><h3 id="dashOrcAberto">0</h3></div>
+    <div class="card" onclick="abrirPorId('os')"><small>OS em andamento</small><h3 id="dashOSAndamento">0</h3></div>
+    <div class="card" onclick="abrirFinanceiroEntradasHoje()"><small>Entradas do dia</small><h3 id="dashRendaDia">R$ 0,00</h3></div>
+    <div class="card" onclick="abrirPorId('os')"><small>A receber</small><h3 id="dashReceber">R$ 0,00</h3></div>
+    <div class="card" onclick="abrirPorId('financeiro')"><small>Lucro do mês</small><h3 id="dashLucroMes">R$ 0,00</h3></div>
     <div class="card" onclick="abrirPorId('clientes')"><small>Clientes cadastrados</small><h3 id="dashClientes">0</h3></div>
   </div>
 
@@ -493,6 +498,7 @@ let _salvarTimer=null, _temPendencia=false;
 function salvarDados(){
   _salvarBackupLocal(_coletarDados(), Date.now()); // cópia local imediata (não se perde)
   _temPendencia=true;
+  try{ atualizarDashboard(); }catch(e){}   // mantém os cards sempre atualizados
   mostrarStatus('saving');
   clearTimeout(_salvarTimer);
   _salvarTimer = setTimeout(enviarParaSupabase, 500);
@@ -630,18 +636,34 @@ function abrirFinanceiro(id,btn){
 function atualizarDashboard(){
   finance.forEach(statusAutomaticoConta);
   const hoje = dataHojeISO();
+  const mes = hoje.slice(0,7); // AAAA-MM
 
-  const contasHoje = finance.filter(f=>f.status !== 'Pago' && String(f.data||'').slice(0,10) === hoje);
+  const contasHoje = finance.filter(f=>f.status!=='Pago' && String(f.data||'').slice(0,10)===hoje);
   const pagarHoje = contasHoje.reduce((s,f)=>s+Number(f.valor||0),0);
-  const orcamentosHoje = quotes.filter(q => q.status==='Aberto' && String(q.createdAt||'').slice(0,10) === hoje).length;
-  const entradasHoje = entradas.filter(e => String(e.data||'').slice(0,10) === hoje);
-  const rendaDia = entradasHoje.reduce((s,e)=>s+Number(e.valor||0),0);
+  const vencidas  = finance.filter(f=>f.status==='Vencido').reduce((s,f)=>s+Number(f.valor||0),0);
+  const pagasMes  = finance.filter(f=>f.status==='Pago' && String(f.data||'').slice(0,7)===mes).reduce((s,f)=>s+Number(f.valor||0),0);
 
-  if(document.getElementById('dashHojePagar')) dashHojePagar.innerText=moeda(pagarHoje);
-  dashAbertos.innerText=orcamentosHoje;
-  if(document.getElementById('dashRendaDia')) dashRendaDia.innerText=moeda(rendaDia);
-  dashReceber.innerText=moeda(0);
-  dashClientes.innerText=clients.length;
+  const orcamentosDia    = quotes.filter(q=>String(q.createdAt||'').slice(0,10)===hoje).length;
+  const orcamentosAberto = quotes.filter(q=>q.status==='Aberto').length;
+  const osAndamento      = serviceOrders.length;
+
+  const entradasHoje = entradas.filter(e=>String(e.data||'').slice(0,10)===hoje);
+  const rendaDia   = entradasHoje.reduce((s,e)=>s+Number(e.valor||0),0);
+  const entradasMes= entradas.filter(e=>String(e.data||'').slice(0,7)===mes).reduce((s,e)=>s+Number(e.valor||0),0);
+  const aReceber   = serviceOrders.reduce((s,o)=>s+Number(o.total||0),0);
+  const lucroMes   = entradasMes - pagasMes;
+
+  const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.innerText=val; };
+  set('dashHojePagar', moeda(pagarHoje));
+  set('dashVencidas',  moeda(vencidas));
+  set('dashPagas',     moeda(pagasMes));
+  set('dashOrcDia',    orcamentosDia);
+  set('dashOrcAberto', orcamentosAberto);
+  set('dashOSAndamento', osAndamento);
+  set('dashRendaDia',  moeda(rendaDia));
+  set('dashReceber',   moeda(aReceber));
+  set('dashLucroMes',  moeda(lucroMes));
+  set('dashClientes',  clients.length);
 
   if(document.getElementById('dashTabelaEntradas')){
     dashTabelaEntradas.innerHTML = entradasHoje.length ? entradasHoje.map(e=>`<tr><td>${escapeHtml(e.descricao)}</td><td>${escapeHtml(e.forma||'-')}</td><td>${moeda(e.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma entrada hoje.</td></tr>';
