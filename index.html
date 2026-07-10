@@ -42,7 +42,9 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 .badge.red{background:#fee2e2;color:#991b1b}
 .badge.blue{background:#dbeafe;color:#1e40af}
 .quote-card,.client-card{border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-top:12px;background:#f9fafb}
-.item-row{display:grid;grid-template-columns:2fr .7fr 1fr .8fr;gap:8px;margin-top:8px}
+.item-row{display:grid;grid-template-columns:2fr .6fr 1fr .7fr 1fr .9fr .4fr;gap:8px;margin-top:8px;align-items:center}
+.item-head{display:grid;grid-template-columns:2fr .6fr 1fr .7fr 1fr .9fr .4fr;gap:8px;margin-top:8px;font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase}
+.item-total{font-weight:800;color:#111}
 .total-box{margin-top:14px;padding:14px;background:#111827;color:white;border-radius:14px;display:flex;justify-content:space-between;font-weight:800}
 .muted{color:#6b7280}
 .editing{background:#fffbeb;border:1px solid #fbbf24;border-radius:14px;padding:12px;margin:12px 0;color:#92400e;font-weight:800}
@@ -149,9 +151,13 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <div id="orcamentoEditandoAviso"></div>
     <p class="muted">Aqui é rápido: nome, placa, veículo e itens. Depois esse cliente pode ser completado na aba Clientes.</p>
     <div class="grid" style="margin-top:14px">
-      <div><label>Nome do cliente</label><input id="qCliente" placeholder="Nome do cliente" oninput="buscarSugestoesOrcamento()"></div>
-      <div><label>Placa</label><input id="qPlaca" placeholder="ABC1D23" oninput="buscarSugestoesOrcamento()"></div>
-      <div><label>Veículo / modelo</label><input id="qVeiculo" placeholder="Ex: Gol, Onix, Corolla" oninput="buscarSugestoesOrcamento()"></div>
+      <div><label>Nome do cliente</label><input id="qCliente" placeholder="Nome do cliente"></div>
+      <div><label>Placa</label><input id="qPlaca" placeholder="ABC1D23"></div>
+      <div><label>Veículo / modelo</label><input id="qVeiculo" placeholder="Ex: Gol, Onix, Corolla"></div>
+      <div style="grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="gray" onclick="buscarSugestoesOrcamento()">Buscar cliente cadastrado</button>
+        <small class="muted">A placa é só texto. O sistema não preenche nada sozinho — a busca só acontece quando você clica.</small>
+      </div>
       <div style="grid-column:1/-1"><div id="sugestoesOrcamento" class="suggestions"></div></div>
     </div>
     <h4 style="margin-top:18px">Serviços e peças</h4>
@@ -161,7 +167,8 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <button class="dark" onclick="finalizarOrcamento()" id="btnFinalizarOrcamento">Finalizar orçamento</button>
       <button class="gray" onclick="cancelarOrcamento()">Cancelar</button>
     </div>
-    <div class="total-box"><span>Total do orçamento</span><span id="totalAtual">R$ 0,00</span></div>
+    <div class="total-box"><span>Total do orçamento (venda)</span><span id="totalAtual">R$ 0,00</span></div>
+    <div id="resumoInternoOrc" class="muted" style="margin-top:8px;font-size:13px"></div>
   </div>
 
   <div class="panel">
@@ -727,10 +734,6 @@ function buscarSugestoesOrcamento(){
   });
 
   window.sugestoesAtuaisOrcamento = encontrados.slice(0,5);
-
-  if(placa && encontrados.length===1){
-    selecionarSugestaoOrcamento(0);
-  }
 }
 
 function selecionarSugestaoOrcamento(index){
@@ -749,24 +752,45 @@ function novoOrcamento(){
   orcamentoEditandoAviso.innerHTML='';
   formOrcamento.style.display='block';
   qCliente.value=''; qPlaca.value=''; qVeiculo.value=''; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
-  currentItems=[]; addLinhaItem({desc:'',qtd:1,valor:0});
+  currentItems=[]; addLinhaItem();
 }
 
-function addLinhaItem(item={desc:'',qtd:1,valor:0}){currentItems.push(item); renderItens(); atualizarTotalAtual()}
+function addLinhaItem(item){currentItems.push(item||{desc:'',qtd:1,valorBruto:'',lucroPct:'',valor:0}); renderItens(); atualizarTotalAtual()}
 function renderItens(){
-  itensEditaveis.innerHTML='';
+  itensEditaveis.innerHTML='<div class="item-head"><span>Descrição</span><span>Qtd</span><span>Bruto (interno)</span><span>% lucro</span><span>Venda unit.</span><span>Total</span><span></span></div>';
   currentItems.forEach((it,i)=>{
+    const total = Number(it.qtd||0)*Number(it.valor||0);
     itensEditaveis.innerHTML += `<div class="item-row">
-      <input placeholder="Descrição" value="${escapeHtml(it.desc)}" oninput="currentItems[${i}].desc=this.value; atualizarTotalAtual()">
-      <input type="number" min="0" step="1" value="${it.qtd}" oninput="currentItems[${i}].qtd=Number(this.value); atualizarTotalAtual()">
-      <input type="number" min="0" step="0.01" value="${it.valor}" oninput="currentItems[${i}].valor=Number(this.value); atualizarTotalAtual()">
-      <button class="red" onclick="removerItem(${i})">Excluir</button>
+      <input placeholder="Descrição" value="${escapeHtml(it.desc||'')}" oninput="currentItems[${i}].desc=this.value">
+      <input type="number" min="0" step="1" value="${it.qtd??1}" onchange="currentItems[${i}].qtd=Number(this.value); renderItens(); atualizarTotalAtual()">
+      <input type="number" min="0" step="0.01" placeholder="opcional" value="${it.valorBruto??''}" onchange="currentItems[${i}].valorBruto=this.value; recalcVendaItem(${i})">
+      <input type="number" min="0" step="0.1" placeholder="opcional" value="${it.lucroPct??''}" onchange="currentItems[${i}].lucroPct=this.value; recalcVendaItem(${i})">
+      <input type="number" min="0" step="0.01" value="${Number(it.valor||0).toFixed(2)}" onchange="currentItems[${i}].valor=Number(this.value); renderItens(); atualizarTotalAtual()">
+      <span class="item-total">${moeda(total)}</span>
+      <button class="red" onclick="removerItem(${i})">×</button>
     </div>`;
   });
 }
+function recalcVendaItem(i){
+  const it=currentItems[i];
+  const bruto=Number(it.valorBruto||0);
+  const pctStr=(it.lucroPct==null?'':String(it.lucroPct)).trim();
+  if(bruto>0 && pctStr!==''){ it.valor=+(bruto*(1+Number(pctStr)/100)).toFixed(2); }
+  renderItens(); atualizarTotalAtual();
+}
 function removerItem(i){currentItems.splice(i,1);renderItens();atualizarTotalAtual()}
 function totalItens(items){return items.reduce((s,it)=>s+(Number(it.qtd||0)*Number(it.valor||0)),0)}
-function atualizarTotalAtual(){totalAtual.innerText=moeda(totalItens(currentItems))}
+function atualizarTotalAtual(){
+  const venda=totalItens(currentItems);
+  totalAtual.innerText=moeda(venda);
+  const custo=currentItems.reduce((s,it)=>s+Number(it.qtd||0)*Number(it.valorBruto||0),0);
+  const el=document.getElementById('resumoInternoOrc');
+  if(el){
+    el.innerHTML = custo>0
+      ? `<strong>Uso interno (não aparece no orçamento do cliente):</strong> Custo das peças informadas: ${moeda(custo)} · Lucro estimado: ${moeda(venda-custo)}`
+      : '';
+  }
+}
 function cancelarOrcamento(){formOrcamento.style.display='none'; editingQuoteId=null}
 
 
