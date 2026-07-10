@@ -354,15 +354,27 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 <section id="funcionarios" class="section">
   <div class="panel">
     <h3 id="funcionarioTitulo">Cadastro de funcionários</h3>
-    <p class="muted">Cadastre os funcionários para vincular depois nas ordens de serviço.</p>
+    <div id="funcionarioAviso"></div>
+    <p class="muted">Cadastre os funcionários para vincular nas ordens de serviço e gerar o pagamento semanal automático.</p>
     <div class="grid">
       <div><label>Nome do funcionário</label><input id="fnNome" placeholder="Nome"></div>
-      <div><label>Telefone</label><input id="fnTelefone" placeholder="WhatsApp"></div>
+      <div><label>Telefone / WhatsApp</label><input id="fnTelefone" placeholder="Telefone"></div>
+      <div><label>Endereço</label><input id="fnEndereco" placeholder="Endereço"></div>
+      <div><label>Cargo</label><input id="fnCargo" placeholder="Ex: Mecânico"></div>
+      <div><label>Salário mensal (R$)</label><input id="fnSalario" type="number" step="0.01" placeholder="0,00"></div>
+      <div><label>Valor do pagamento semanal (R$)</label><input id="fnSemanal" type="number" step="0.01" placeholder="0,00"></div>
+      <div><label>Forma de pagamento</label><select id="fnFormaPgto"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option></select></div>
+      <div><label>Data de admissão</label><input id="fnAdmissao" type="date"></div>
       <div><label>Data de nascimento</label><input id="fnNascimento" type="date"></div>
+      <div style="grid-column:1/-1"><label>Observações</label><input id="fnObs" placeholder="Outras informações"></div>
+      <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="fnGeraSemanal" style="width:auto" checked>
+        <label for="fnGeraSemanal" style="margin:0">Gerar conta de pagamento semanal automaticamente em Contas a Pagar</label>
+      </div>
     </div>
     <div class="actions">
       <button class="dark" onclick="salvarFuncionario()" id="btnSalvarFuncionario">Salvar funcionário</button>
-      <button class="gray" onclick="limparFuncionario()">Limpar</button>
+      <button class="gray" onclick="limparFuncionario()">Cancelar / Limpar</button>
     </div>
   </div>
   <div class="panel">
@@ -383,6 +395,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <div><label>E-mail</label><input id="cEmail"></div>
       <div><label>Endereço / CEP</label><input id="cEnd"></div>
       <div><label>Data de nascimento</label><input id="cNasc" type="date"></div>
+      <div style="grid-column:1/-1"><label>Observações</label><input id="cObs" placeholder="Outras informações"></div>
     </div>
 
     <div class="panel" style="box-shadow:none;border:1px dashed #d1d5db">
@@ -422,7 +435,7 @@ let quotes=[], serviceOrders=[], clients=[], funcionarios=[], servicosConcluidos
 let finance=[];
 let saidas=[];
 let entradas=[];
-let currentItems=[], editingQuoteId=null, editingClientId=null;
+let currentItems=[], editingQuoteId=null, editingClientId=null, editingFuncId=null;
 
 const ddaItauImportado = [];
 function chaveConta(c){ return String(c.data||'') + '|' + Number(c.valor||0).toFixed(2); }
@@ -605,6 +618,7 @@ async function iniciarApp(){
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='block';
   await carregarDadosSalvos();
+  if(gerarPagamentosSemanais()) salvarDados();
   renderTudo();
 }
 function renderTudo(){
@@ -822,6 +836,68 @@ function salvarClienteBasicoDoOrcamento(q){
   }
 }
 
+function salvarCliente(){
+  if(!cNome.value.trim()){alert('Informe o nome do cliente.');return}
+  const dados={
+    nome:cNome.value.trim(), cpf:cCpf.value.trim(), tel:cTel.value.trim(),
+    email:cEmail.value.trim(), end:cEnd.value.trim(), nasc:cNasc.value, obs:cObs.value.trim(),
+    veiculo:cVeiculo.value.trim(), placa:cPlaca.value.trim(),
+    veiculo2:cVeiculo2.value.trim(), placa2:cPlaca2.value.trim(),
+    veiculo3:cVeiculo3.value.trim(), placa3:cPlaca3.value.trim(),
+    cadastroBasico:false
+  };
+  if(editingClientId){
+    const c=clients.find(x=>String(x.id)===String(editingClientId));
+    if(c) Object.assign(c,dados);
+  } else {
+    clients.push({id:Date.now()+Math.floor(Math.random()*1000), ...dados});
+  }
+  limparFormularioCliente();
+  renderClientes(); atualizarDashboard(); salvarDados();
+}
+function limparFormularioCliente(){
+  editingClientId=null;
+  ['cNome','cCpf','cTel','cEmail','cEnd','cNasc','cObs','cVeiculo','cPlaca','cVeiculo2','cPlaca2','cVeiculo3','cPlaca3'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  if(document.getElementById('clienteTitulo')) clienteTitulo.innerText='Cadastro completo de clientes';
+  if(document.getElementById('btnSalvarCliente')) btnSalvarCliente.innerText='Salvar cliente';
+  if(document.getElementById('clienteAviso')) clienteAviso.innerHTML='';
+}
+function editarCliente(id){
+  const c=clients.find(x=>String(x.id)===String(id)); if(!c)return;
+  editingClientId=c.id;
+  cNome.value=c.nome||''; cCpf.value=c.cpf||''; cTel.value=c.tel||'';
+  cEmail.value=c.email||''; cEnd.value=c.end||''; cNasc.value=c.nasc||''; cObs.value=c.obs||'';
+  cVeiculo.value=c.veiculo||''; cPlaca.value=c.placa||'';
+  cVeiculo2.value=c.veiculo2||''; cPlaca2.value=c.placa2||'';
+  cVeiculo3.value=c.veiculo3||''; cPlaca3.value=c.placa3||'';
+  if(document.getElementById('clienteTitulo')) clienteTitulo.innerText='Editando: '+(c.nome||'cliente');
+  if(document.getElementById('btnSalvarCliente')) btnSalvarCliente.innerText='Salvar alterações';
+  if(document.getElementById('clienteAviso')) clienteAviso.innerHTML = c.cadastroBasico ? '<div class="editing">Cadastro incompleto — complete os dados abaixo e salve.</div>' : '';
+  if(document.getElementById('clienteTitulo')) clienteTitulo.scrollIntoView({behavior:'smooth'});
+}
+function excluirCliente(id){
+  if(!confirm('Tem certeza que deseja excluir este cliente?'))return;
+  clients=clients.filter(x=>String(x.id)!==String(id));
+  renderClientes(); atualizarDashboard(); salvarDados();
+}
+function renderClientes(){
+  if(!document.getElementById('listaClientes'))return;
+  const ordenados=[...clients].sort((a,b)=>(a.nome||'').localeCompare((b.nome||''),'pt',{sensitivity:'base'}));
+  if(ordenados.length===0){ listaClientes.innerHTML='<p class="muted">Nenhum cliente cadastrado ainda.</p>'; return; }
+  listaClientes.innerHTML = ordenados.map(c=>{
+    const veics=todosVeiculosCliente(c).map(v=>`${escapeHtml(v.veiculo||'-')} (${escapeHtml(v.placa||'-')})`).join(' · ') || '-';
+    const badge = c.cadastroBasico ? '<span class="badge" style="background:#fef3c7;color:#92400e">Cadastro incompleto</span>' : '<span class="badge green">Completo</span>';
+    return `<div class="client-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><strong>${escapeHtml(c.nome||'(sem nome)')}</strong> ${badge}</div>
+      <small>Tel: ${escapeHtml(c.tel||'-')} | CPF: ${escapeHtml(c.cpf||'-')} | Veículos: ${veics}</small>
+      <div class="actions">
+        <button onclick="editarCliente('${c.id}')">Abrir / Editar</button>
+        <button class="red" onclick="excluirCliente('${c.id}')">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function finalizarOrcamento(){
   if(!qCliente.value){alert('Informe o nome do cliente.');return}
   if(currentItems.length===0){alert('Adicione pelo menos um item.');return}
@@ -1027,39 +1103,117 @@ function gerarPDFConcluido(id){
 }
 
 function salvarFuncionario(){
-  if(!fnNome.value){alert('Informe o nome do funcionário.');return}
-  funcionarios.push({id:Date.now(), nome:fnNome.value, telefone:fnTelefone.value, nascimento:fnNascimento.value});
+  if(!fnNome.value.trim()){alert('Informe o nome do funcionário.');return}
+  const dados={
+    nome:fnNome.value.trim(), telefone:fnTelefone.value.trim(), endereco:fnEndereco.value.trim(),
+    cargo:fnCargo.value.trim(), salarioMensal:Number(fnSalario.value||0),
+    valorSemanal:Number(fnSemanal.value||0), formaPagamento:fnFormaPgto.value,
+    admissao:fnAdmissao.value, nascimento:fnNascimento.value, obs:fnObs.value.trim(),
+    geraSemanal:fnGeraSemanal.checked
+  };
+  if(editingFuncId){
+    const f=funcionarios.find(x=>String(x.id)===String(editingFuncId));
+    if(f) Object.assign(f,dados);
+  } else {
+    funcionarios.push({id:Date.now(), ...dados});
+  }
   limparFuncionario();
-  renderFuncionarios();
-  renderOS();
-  salvarDados();
+  gerarPagamentosSemanais();
+  renderFuncionarios(); renderOS(); atualizarDashboard(); salvarDados();
 }
 
 function limparFuncionario(){
-  fnNome.value=''; fnTelefone.value=''; fnNascimento.value='';
+  editingFuncId=null;
+  ['fnNome','fnTelefone','fnEndereco','fnCargo','fnSalario','fnSemanal','fnAdmissao','fnNascimento','fnObs'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  if(document.getElementById('fnFormaPgto')) fnFormaPgto.value='Dinheiro';
+  if(document.getElementById('fnGeraSemanal')) fnGeraSemanal.checked=true;
+  if(document.getElementById('funcionarioTitulo')) funcionarioTitulo.innerText='Cadastro de funcionários';
+  if(document.getElementById('btnSalvarFuncionario')) btnSalvarFuncionario.innerText='Salvar funcionário';
+  if(document.getElementById('funcionarioAviso')) funcionarioAviso.innerHTML='';
+}
+
+function editarFuncionario(id){
+  const f=funcionarios.find(x=>String(x.id)===String(id)); if(!f)return;
+  editingFuncId=f.id;
+  fnNome.value=f.nome||''; fnTelefone.value=f.telefone||''; fnEndereco.value=f.endereco||'';
+  fnCargo.value=f.cargo||''; fnSalario.value=f.salarioMensal||''; fnSemanal.value=f.valorSemanal||'';
+  fnFormaPgto.value=f.formaPagamento||'Dinheiro'; fnAdmissao.value=f.admissao||'';
+  fnNascimento.value=f.nascimento||''; fnObs.value=f.obs||'';
+  fnGeraSemanal.checked = f.geraSemanal!==false;
+  if(document.getElementById('funcionarioTitulo')) funcionarioTitulo.innerText='Editando: '+(f.nome||'funcionário');
+  if(document.getElementById('btnSalvarFuncionario')) btnSalvarFuncionario.innerText='Salvar alterações';
+  if(document.getElementById('funcionarioTitulo')) funcionarioTitulo.scrollIntoView({behavior:'smooth'});
 }
 
 function excluirFuncionario(id){
   if(!confirm('Tem certeza que deseja excluir este funcionário?')) return;
-  funcionarios = funcionarios.filter(f=>f.id!==id);
+  funcionarios = funcionarios.filter(f=>String(f.id)!==String(id));
   serviceOrders.forEach(o=>{ if(String(o.funcionarioId)===String(id)) o.funcionarioId=''; });
-  renderFuncionarios(); renderOS(); salvarDados();
+  renderFuncionarios(); renderOS(); atualizarDashboard(); salvarDados();
+}
+
+function historicoFuncionario(id){
+  const f=funcionarios.find(x=>String(x.id)===String(id)); if(!f)return;
+  const contas=finance.filter(c=>c.origem==='FuncionarioSemanal' && String(c.funcId)===String(id))
+    .sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+  if(contas.length===0){ alert('Ainda não há pagamentos semanais gerados para '+(f.nome||'')+'.'); return; }
+  const linhas=contas.map(c=>`${dataBR(c.data)}  —  ${moeda(c.valor)}  —  ${statusAutomaticoConta(c)}`).join('\n');
+  alert('Histórico de pagamentos semanais de '+(f.nome||'')+':\n\n'+linhas);
+}
+
+// Gera 1 conta por semana por funcionário (valor da época preservado nas contas já criadas)
+function _numeroSemanaISO(d){
+  const date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const dayNum=(date.getUTCDay()+6)%7;
+  date.setUTCDate(date.getUTCDate()-dayNum+3);
+  const firstThursday=new Date(Date.UTC(date.getUTCFullYear(),0,4));
+  const firstDayNum=(firstThursday.getUTCDay()+6)%7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate()-firstDayNum+3);
+  const week=1+Math.round((date-firstThursday)/(7*24*3600*1000));
+  return date.getUTCFullYear()+'-W'+String(week).padStart(2,'0');
+}
+function _vencimentoSexta(d){
+  const date=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const dayNum=(date.getDay()+6)%7;
+  date.setDate(date.getDate()-dayNum+4);
+  return date.toISOString().slice(0,10);
+}
+function gerarPagamentosSemanais(){
+  const hoje=new Date();
+  const semana=_numeroSemanaISO(hoje);
+  const venc=_vencimentoSexta(hoje);
+  let criou=false;
+  funcionarios.forEach(f=>{
+    if(f.geraSemanal===false) return;
+    const valor=Number(f.valorSemanal||0);
+    if(valor<=0) return;
+    const jaExiste=finance.some(c=>c.origem==='FuncionarioSemanal' && String(c.funcId)===String(f.id) && c.semana===semana);
+    if(!jaExiste){
+      finance.push({id:Date.now()+Math.floor(Math.random()*100000), tipo:'Semanal', data:venc, descricao:'Pagamento semanal - '+(f.nome||''), valor:valor, status:'A vencer', origem:'FuncionarioSemanal', funcId:f.id, semana:semana});
+      criou=true;
+    }
+  });
+  return criou;
 }
 
 function renderFuncionarios(){
   if(!document.getElementById('listaFuncionarios'))return;
-  listaFuncionarios.innerHTML='';
-  if(funcionarios.length===0){
-    listaFuncionarios.innerHTML='<p class="muted">Nenhum funcionário cadastrado.</p>';
-    return;
-  }
-  funcionarios.forEach(f=>{
-    listaFuncionarios.innerHTML += `<div class="client-card">
-      <strong>${escapeHtml(f.nome)}</strong><br>
-      <small>Telefone: ${escapeHtml(f.telefone||'-')} | Nascimento: ${f.nascimento ? dataBR(f.nascimento) : '-'}</small>
-      <div class="actions"><button class="red" onclick="excluirFuncionario(${f.id})">Excluir</button></div>
+  const ordenados=[...funcionarios].sort((a,b)=>(a.nome||'').localeCompare((b.nome||''),'pt',{sensitivity:'base'}));
+  if(ordenados.length===0){ listaFuncionarios.innerHTML='<p class="muted">Nenhum funcionário cadastrado.</p>'; return; }
+  listaFuncionarios.innerHTML = ordenados.map(f=>{
+    const auto = (f.geraSemanal!==false && Number(f.valorSemanal||0)>0)
+      ? `<span class="badge green">Pgto semanal: ${moeda(f.valorSemanal)}</span>`
+      : '<span class="badge" style="background:#e5e7eb;color:#374151">Sem pgto semanal automático</span>';
+    return `<div class="client-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><strong>${escapeHtml(f.nome)}</strong> ${auto}</div>
+      <small>Cargo: ${escapeHtml(f.cargo||'-')} | Tel: ${escapeHtml(f.telefone||'-')} | Admissão: ${f.admissao?dataBR(f.admissao):'-'} | Salário: ${f.salarioMensal?moeda(f.salarioMensal):'-'}</small>
+      <div class="actions">
+        <button onclick="editarFuncionario('${f.id}')">Abrir / Editar</button>
+        <button onclick="historicoFuncionario('${f.id}')">Histórico</button>
+        <button class="red" onclick="excluirFuncionario('${f.id}')">Excluir</button>
+      </div>
     </div>`;
-  });
+  }).join('');
 }
 
 function gerarPDF(id){
