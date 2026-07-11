@@ -91,6 +91,11 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 .valor-wrap span{font-weight:800;color:#111827}
 .valor-wrap input{min-width:105px}
 @media(max-width:950px){aside{position:relative;width:100%}main{margin-left:0}.cards,.grid,.grid2,.item-row{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
+.cp-modal-overlay{display:none;position:fixed;inset:0;background:rgba(17,24,39,.5);z-index:9998;align-items:center;justify-content:center;padding:20px}
+.cp-modal-overlay.aberto{display:flex}
+.cp-modal{background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.cp-modal h3{margin-top:0;color:#f59e0b}
+.cp-modal .actions{margin-top:16px;display:flex;gap:10px;justify-content:flex-end}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -351,6 +356,48 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     </div>
   </div>
 
+  <div class="cp-modal-overlay" id="modalContaOverlay">
+    <div class="cp-modal">
+      <h3 id="mcTitulo">Nova conta</h3>
+      <input type="hidden" id="mcIndex">
+      <div class="grid2">
+        <div style="grid-column:1/-1"><label>Descrição</label><input id="mcDescricao" placeholder="Ex: Aluguel, Fornecedor de peças..."></div>
+        <div><label>Categoria</label><input id="mcCategoria" placeholder="Ex: Estrutura, Peças, Marketing"></div>
+        <div><label>Fornecedor</label><input id="mcFornecedor" placeholder="Nome do fornecedor"></div>
+        <div><label>Centro de custo</label><input id="mcCentroCusto" placeholder="Ex: Oficina, Administração"></div>
+        <div><label>Valor (R$)</label><input id="mcValor" type="number" step="0.01" placeholder="Deixe em branco se ainda não sabe"></div>
+        <div><label>Data de vencimento</label><input id="mcData" type="date"></div>
+        <div><label>Forma de pagamento prevista</label><select id="mcFormaPagamento"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
+        <div><label>Tipo</label><select id="mcTipo"><option>Mensal</option><option>Variável</option><option>Semanal</option></select></div>
+        <div><label>Parcela atual / total</label><input id="mcParcela" placeholder="Ex: 3/12"></div>
+        <div style="grid-column:1/-1"><label>Observações</label><input id="mcObs" placeholder="Outras informações"></div>
+      </div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalConta()">Cancelar</button>
+        <button class="dark" onclick="salvarContaForm()">Salvar conta</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalPagamentoOverlay">
+    <div class="cp-modal">
+      <h3>Confirmar pagamento</h3>
+      <p class="muted" id="mpDescricaoConta">Tem certeza de que esta conta foi paga?</p>
+      <input type="hidden" id="mpIndex">
+      <div class="grid2">
+        <div><label>Data do pagamento</label><input id="mpData" type="date"></div>
+        <div><label>Valor pago (R$)</label><input id="mpValor" type="number" step="0.01"></div>
+        <div><label>Forma de pagamento</label><select id="mpForma"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
+        <div><label>Conta / caixa</label><input id="mpConta" placeholder="Ex: Caixa, Banco X"></div>
+        <div style="grid-column:1/-1"><label>Observação</label><input id="mpObs" placeholder="Opcional"></div>
+      </div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalPagamento()">Cancelar</button>
+        <button class="dark" onclick="confirmarPagamentoConta()">Confirmar pagamento</button>
+      </div>
+    </div>
+  </div>
+
   <div id="finEntradas" class="finance-subsection">
     <div class="panel">
       <h3>Entradas</h3>
@@ -599,6 +646,7 @@ function limparOrcamentosAntigos(){
 
 function statusAutomaticoConta(c){
   if(c.status === 'Pago') return 'Pago';
+  if(c.status === 'Parcialmente pago') return 'Parcialmente pago';
   const semValor = (c.valor===null || c.valor===undefined || c.valor==='' || Number(c.valor)===0);
   if(semValor){ c.status='Aguardando valor'; return 'Aguardando valor'; }
   const hoje = dataHojeISO();
@@ -1666,8 +1714,8 @@ function renderFinanceiro(filtro='pendentes'){
 
     const parcela=(c.parcelaAtual||c.totalParcelas)?`${c.parcelaAtual||'-'}${c.totalParcelas?'/'+c.totalParcelas:''}`:'';
     const statusTexto = statusAutomaticoConta(c);
-    const classe = statusTexto==='Vencido'?'status-vencido' : statusTexto==='Pago'?'status-pago' : statusTexto==='Vence hoje'?'status-vencehoje' : statusTexto==='Aguardando valor'?'status-aguardando' : 'status-avencer';
-    const badgeCor = statusTexto==='Pago'?'green' : statusTexto==='Vencido'?'red' : statusTexto==='Vence hoje'?'orange' : statusTexto==='Aguardando valor'?'gray' : '';
+    const classe = statusTexto==='Vencido'?'status-vencido' : (statusTexto==='Pago'||statusTexto==='Parcialmente pago')?'status-pago' : statusTexto==='Vence hoje'?'status-vencehoje' : statusTexto==='Aguardando valor'?'status-aguardando' : 'status-avencer';
+    const badgeCor = statusTexto==='Pago'?'green' : statusTexto==='Parcialmente pago'?'blue' : statusTexto==='Vencido'?'red' : statusTexto==='Vence hoje'?'orange' : statusTexto==='Aguardando valor'?'gray' : '';
 
     listaContasPagar.innerHTML += `<tr class="${classe}">
       <td><input class="inline-input" type="date" value="${c.data||''}" onchange="alterarCampoConta(${i},'data',this.value)"></td>
@@ -1676,10 +1724,10 @@ function renderFinanceiro(filtro='pendentes'){
       <td><div class="valor-wrap"><span>R$</span><input class="inline-input" type="number" step="0.01" value="${Number(c.valor||0).toFixed(2)}" onchange="alterarCampoConta(${i},'valor',this.value)"></div></td>
       <td>
         <span class="badge ${badgeCor}">${statusTexto}</span><br>
-        ${statusTexto==='Pago' ? '<small>Pago</small>' : `<button class="green" style="margin-top:5px;padding:6px 8px" onclick="marcarContaPaga(${i})">Marcar pago</button>`}
+        ${(statusTexto==='Pago'||statusTexto==='Parcialmente pago') ? `<button class="gray" style="margin-top:5px;padding:6px 8px" onclick="desfazerPagamento(${i})">Desfazer pagamento</button>` : `<button class="green" style="margin-top:5px;padding:6px 8px" onclick="marcarContaPaga(${i})">Marcar pago</button>`}
       </td>
       <td><input class="inline-input" value="${parcela}" onchange="alterarParcelaConta(${i},this.value)"></td>
-      <td><button class="red" onclick="excluirConta(${i})">Excluir</button></td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="editarConta(${i})">Editar</button><button class="red" onclick="excluirConta(${i})">Excluir</button></td>
     </tr>`;
   });
 
@@ -1712,15 +1760,78 @@ function renderFinanceiro(filtro='pendentes'){
   salvarDados();
 }
 function abrirNovaConta(){
-  finance.push({id:Date.now()+Math.floor(Math.random()*100000), data:dataHojeISO(), descricao:'Nova conta', tipo:'Mensal', valor:0, status:'Aguardando valor', origem:'Manual'});
-  filtrarFinanceiro('pendentes');
+  document.getElementById('mcTitulo').innerText='Nova conta';
+  mcIndex.value=''; mcDescricao.value=''; mcCategoria.value=''; mcFornecedor.value=''; mcCentroCusto.value='';
+  mcValor.value=''; mcData.value=dataHojeISO(); mcFormaPagamento.value='Dinheiro'; mcTipo.value='Mensal';
+  mcParcela.value=''; mcObs.value='';
+  modalContaOverlay.classList.add('aberto');
+}
+function editarConta(i){
+  const c=finance[i]; if(!c)return;
+  document.getElementById('mcTitulo').innerText='Editar conta';
+  mcIndex.value=i; mcDescricao.value=c.descricao||''; mcCategoria.value=c.categoria||''; mcFornecedor.value=c.fornecedor||'';
+  mcCentroCusto.value=c.centroCusto||''; mcValor.value=c.valor||''; mcData.value=c.data||''; mcFormaPagamento.value=c.formaPagamento||'Dinheiro';
+  mcTipo.value=c.tipo||'Mensal'; mcParcela.value=(c.parcelaAtual||c.totalParcelas)?`${c.parcelaAtual||''}${c.totalParcelas?'/'+c.totalParcelas:''}`:'';
+  mcObs.value=c.obs||'';
+  modalContaOverlay.classList.add('aberto');
+}
+function fecharModalConta(){ modalContaOverlay.classList.remove('aberto'); }
+function salvarContaForm(){
+  if(!mcDescricao.value.trim()){alert('Informe a descrição da conta.');return}
+  if(!mcData.value){alert('Informe a data de vencimento.');return}
+  const partes=(mcParcela.value||'').split('/');
+  const dados={
+    descricao:mcDescricao.value.trim(), categoria:mcCategoria.value.trim(), fornecedor:mcFornecedor.value.trim(),
+    centroCusto:mcCentroCusto.value.trim(), valor:mcValor.value===''?0:Number(mcValor.value),
+    data:mcData.value, formaPagamento:mcFormaPagamento.value, tipo:mcTipo.value,
+    parcelaAtual:partes[0]?partes[0].trim():'', totalParcelas:partes[1]?partes[1].trim():'',
+    obs:mcObs.value.trim()
+  };
+  const idx=mcIndex.value;
+  if(idx!==''){
+    const c=finance[Number(idx)];
+    if(c){ Object.assign(c,dados); if(c.status!=='Pago' && c.status!=='Parcialmente pago') c.status=''; }
+  } else {
+    finance.push({id:Date.now()+Math.floor(Math.random()*100000), origem:'Manual', status:'', ...dados});
+  }
+  fecharModalConta();
+  filtrarFinanceiro(window.filtroAtual||'pendentes');
+  atualizarDashboard();
   salvarAgora();
 }
 function marcarContaPaga(i){
-  finance[i].status='Pago';
-  renderFinanceiro(window.filtroAtual||'todos');
+  const c=finance[i]; if(!c)return;
+  if(!confirm('Tem certeza de que esta conta foi paga?'))return;
+  mpIndex.value=i; mpDescricaoConta.innerText='Conta: '+(c.descricao||'')+' — '+moeda(c.valor||0);
+  mpData.value=dataHojeISO(); mpValor.value=c.valor||''; mpForma.value=c.formaPagamento||'Dinheiro'; mpConta.value=''; mpObs.value='';
+  modalPagamentoOverlay.classList.add('aberto');
+}
+function fecharModalPagamento(){ modalPagamentoOverlay.classList.remove('aberto'); }
+function confirmarPagamentoConta(){
+  const i=Number(mpIndex.value); const c=finance[i]; if(!c)return;
+  const valorPago=Number(mpValor.value||0);
+  if(valorPago<=0){alert('Informe o valor pago.');return}
+  const saidaId=Date.now()+Math.floor(Math.random()*100000);
+  saidas.push({id:saidaId, data:mpData.value||dataHojeISO(), descricao:'Pagamento: '+(c.descricao||''), categoria:c.categoria||'Contas a Pagar', valor:valorPago, formaPagamento:mpForma.value, contaCaixa:mpConta.value.trim(), obs:mpObs.value.trim(), origem:'ContaPaga', contaId:c.id});
+  c.pagamento={saidaId, data:mpData.value, valor:valorPago, forma:mpForma.value, conta:mpConta.value.trim(), obs:mpObs.value.trim()};
+  c.status = valorPago >= Number(c.valor||0) ? 'Pago' : 'Parcialmente pago';
+  fecharModalPagamento();
+  renderFinanceiro(window.filtroAtual||'pendentes');
   atualizarDashboard();
-  salvarDados();
+  salvarAgora();
+}
+function desfazerPagamento(i){
+  const c=finance[i]; if(!c)return;
+  if(!confirm('Tem certeza de que deseja desfazer este pagamento?'))return;
+  if(c.pagamento && c.pagamento.saidaId){
+    saidas = saidas.filter(s=>s.id!==c.pagamento.saidaId);
+  }
+  delete c.pagamento;
+  c.status='';
+  statusAutomaticoConta(c);
+  renderFinanceiro(window.filtroAtual||'pendentes');
+  atualizarDashboard();
+  salvarAgora();
 }
 function renderEntradas(){
   const tabela = document.getElementById('listaEntradas');
