@@ -876,9 +876,9 @@ function editarCliente(id){
   if(document.getElementById('clienteTitulo')) clienteTitulo.scrollIntoView({behavior:'smooth'});
 }
 function excluirCliente(id){
-  if(!confirm('Tem certeza que deseja excluir este cliente?'))return;
+  if(!confirm('Tem certeza de que deseja excluir este registro? Esta ação não poderá ser desfeita.'))return;
   clients=clients.filter(x=>String(x.id)!==String(id));
-  renderClientes(); atualizarDashboard(); salvarDados();
+  renderClientes(); atualizarDashboard(); salvarAgora();
 }
 function renderClientes(){
   if(!document.getElementById('listaClientes'))return;
@@ -948,7 +948,7 @@ function renderQuotes(){
     </div>`;
   });
 }
-function excluirOrcamento(id){if(!confirm('Tem certeza que deseja excluir este orçamento?'))return;quotes=quotes.filter(q=>q.id!==id);renderQuotes();atualizarDashboard();salvarDados()}
+function excluirOrcamento(id){if(!confirm('Tem certeza de que deseja excluir este registro? Esta ação não poderá ser desfeita.'))return;quotes=quotes.filter(q=>q.id!==id);renderQuotes();atualizarDashboard();salvarAgora()}
 function aprovarOrcamento(id){
   const q=quotes.find(x=>x.id===id); if(!q)return;
   q.status='OS';
@@ -1146,10 +1146,10 @@ function editarFuncionario(id){
 }
 
 function excluirFuncionario(id){
-  if(!confirm('Tem certeza que deseja excluir este funcionário?')) return;
+  if(!confirm('Tem certeza de que deseja excluir este registro? Esta ação não poderá ser desfeita.')) return;
   funcionarios = funcionarios.filter(f=>String(f.id)!==String(id));
   serviceOrders.forEach(o=>{ if(String(o.funcionarioId)===String(id)) o.funcionarioId=''; });
-  renderFuncionarios(); renderOS(); atualizarDashboard(); salvarDados();
+  renderFuncionarios(); renderOS(); atualizarDashboard(); salvarAgora();
 }
 
 function historicoFuncionario(id){
@@ -1570,10 +1570,11 @@ function alterarParcelaConta(i, valor){
 }
 function excluirConta(i){
   if(!finance[i]) return;
-  if(!confirm('Excluir este pagamento?')) return;
+  if(!confirm('Tem certeza de que deseja excluir este registro? Esta ação não poderá ser desfeita.')) return;
   finance.splice(i,1);
   renderFinanceiro(window.filtroAtual||'todos');
   atualizarDashboard();
+  salvarAgora();
 }
 function filtrarFinanceiro(filtro){window.filtroAtual=filtro; renderFinanceiro(filtro)}
 function contaPassaFiltro(c,filtro){
@@ -1702,7 +1703,7 @@ function alterarCampoEntrada(i,campo,valor){
 }
 
 function excluirEntrada(i){
-  if(!confirm('Deseja realmente excluir esta entrada?')) return;
+  if(!confirm('Tem certeza de que deseja excluir este registro? Esta ação não poderá ser desfeita.')) return;
 
   const e = entradas[i];
 
@@ -1714,7 +1715,16 @@ function excluirEntrada(i){
   renderEntradas();
   if(typeof renderConcluidos === 'function') renderConcluidos();
   atualizarDashboard();
-  salvarDados();
+  salvarAgora();
+}
+
+function excluirSaida(i){
+  if(!saidas[i]) return;
+  if(!confirm('Tem certeza de que deseja excluir este registro? Esta ação não poderá ser desfeita.')) return;
+  saidas.splice(i,1);
+  renderSaidas();
+  atualizarDashboard();
+  salvarAgora();
 }
 
 
