@@ -57,6 +57,32 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 .status-vencido{background:#fef2f2}
 .status-pago{background:#f0fdf4}
 .status-avencer{background:#fffbeb}
+.status-vencehoje{background:#fff7ed}
+.status-aguardando{background:#f9fafb}
+.badge.orange{background:#ffedd5;color:#9a3412}
+.badge.gray{background:#e5e7eb;color:#374151}
+/* Contas a Pagar - Camada 1 */
+.cp-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.cp-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.btn-nova{background:#f59e0b;color:#fff;font-weight:800}
+.btn-soon{background:#f3f4f6;color:#9ca3af;border:1px solid #e5e7eb}
+.cp-cards{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:16px 0}
+.cp-card{border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;cursor:pointer;transition:.15s;background:#fff}
+.cp-card:hover{border-color:#f59e0b;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.cp-card small{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:#6b7280}
+.cp-card .cp-val{font-size:18px;font-weight:800;margin-top:4px;color:#111}
+.cp-card .cp-qtd{font-size:11px;color:#9ca3af;margin-top:2px}
+.cp-card.c-verm{border-left:4px solid #dc2626}
+.cp-card.c-laranja{border-left:4px solid #f59e0b}
+.cp-card.c-amar{border-left:4px solid #eab308}
+.cp-card.c-verde{border-left:4px solid #16a34a}
+.cp-card.c-cinza{border-left:4px solid #9ca3af}
+.cp-card.c-preto{border-left:4px solid #111}
+.cp-filtros{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.cp-filtro{padding:7px 14px;border:1px solid #d1d5db;border-radius:999px;background:#fff;font-size:13px;font-weight:700;color:#374151;cursor:pointer}
+.cp-filtro:hover{border-color:#f59e0b}
+.cp-filtro.ativo{background:#f59e0b;border-color:#f59e0b;color:#fff}
+@media(max-width:950px){.cp-cards{grid-template-columns:repeat(2,1fr)}}
 .finance-subsection{display:none}
 .finance-subsection.active{display:block}
 .inline-input{min-width:110px;padding:8px;border-radius:8px}
@@ -279,45 +305,43 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 
   <div id="finPagamentos" class="finance-subsection">
     <div class="panel">
-      <h3>Pagamentos</h3>
-      <p class="muted">Funciona como a planilha: edite data, valor, status e parcela direto na tabela.</p>
-      <div class="actions">
-        <button onclick="filtrarFinanceiro('todos')">Todos</button>
-        <button onclick="filtrarFinanceiro('hoje')">Hoje</button>
-        <button onclick="filtrarFinanceiro('semana')">Esta semana</button>
-        <button onclick="filtrarFinanceiro('mes')">Este mês</button>
-        <button onclick="filtrarFinanceiro('vencido')">Vencidos</button>
-        <button onclick="filtrarFinanceiro('avencer')">A vencer</button>
-        <button onclick="filtrarFinanceiro('pago')">Pagos</button>
-        <button onclick="filtrarFinanceiro('mensal')">Mensais</button>
-        <button onclick="filtrarFinanceiro('variavel')">Variáveis</button>
-      </div>
-      <div class="panel" style="box-shadow:none;border:1px dashed #d1d5db;margin-top:14px">
-        <h4>Pesquisar por período</h4>
-        <p class="muted">Escolha uma data inicial e final para ver e somar os pagamentos desse período.</p>
-        <div class="grid2">
-          <div><label>Data inicial</label><input id="dataInicioFiltro" type="date"></div>
-          <div><label>Data final</label><input id="dataFimFiltro" type="date"></div>
-          <div><label>Resultado</label><input id="resultadoFiltroPeriodo" disabled placeholder="Escolha o período e clique em buscar"></div>
-          <div style="display:flex;align-items:end;gap:10px">
-            <button onclick="filtrarPorPeriodo()">Buscar período</button>
-            <button class="gray" onclick="limparFiltroPeriodo()">Limpar período</button>
-          </div>
+      <div class="cp-topo">
+        <div>
+          <h3>Contas a Pagar</h3>
+          <p class="muted">Todas as contas da oficina em um só lugar. Clique num card para filtrar; edite data, valor e status direto na tabela.</p>
+        </div>
+        <div class="cp-acoes">
+          <button class="btn-nova" onclick="abrirNovaConta()">+ Nova Conta</button>
+          <button class="btn-soon" onclick="alert('Contas Recorrentes chega na próxima etapa (Camada 2).')">Contas Recorrentes</button>
+          <button class="btn-soon" onclick="alert('Preparar Próximo Mês chega na próxima etapa (Camada 2).')">Preparar Próximo Mês</button>
         </div>
       </div>
-      <div class="panel" style="box-shadow:none;border:1px dashed #d1d5db;margin-top:14px">
-        <h4>Pesquisar por data específica</h4>
-        <p class="muted">Escolha qualquer data para ver pagamentos daquele dia, seja passado ou futuro.</p>
-        <div class="grid2">
-          <div><label>Data do pagamento</label><input id="dataFiltroPagamento" type="date"></div><div><label>Resultado</label><input id="resultadoFiltroData" disabled placeholder="Escolha uma data e clique em Buscar data"></div>
-          <div style="display:flex;align-items:end;gap:10px">
-            <button onclick="filtrarPorDataEspecifica()">Buscar data</button>
-            <button class="gray" onclick="limparFiltroData()">Limpar data</button>
-          </div>
-        </div>
+
+      <div class="cp-cards">
+        <div class="cp-card c-verm" onclick="filtrarFinanceiro('vencido')"><small>Vencidas</small><div class="cp-val" id="cpVencidas">R$ 0,00</div><div class="cp-qtd" id="cpVencidasQtd">0 contas</div></div>
+        <div class="cp-card c-laranja" onclick="filtrarFinanceiro('hoje')"><small>Vencem hoje</small><div class="cp-val" id="cpHoje">R$ 0,00</div><div class="cp-qtd" id="cpHojeQtd">0 contas</div></div>
+        <div class="cp-card c-amar" onclick="filtrarFinanceiro('semana')"><small>Esta semana</small><div class="cp-val" id="cpSemana">R$ 0,00</div><div class="cp-qtd" id="cpSemanaQtd">0 contas</div></div>
+        <div class="cp-card c-preto" onclick="filtrarFinanceiro('avencer')"><small>A vencer</small><div class="cp-val" id="cpAvencer">R$ 0,00</div><div class="cp-qtd" id="cpAvencerQtd">0 contas</div></div>
+        <div class="cp-card c-cinza" onclick="filtrarFinanceiro('pendentes')"><small>Total pendente</small><div class="cp-val" id="cpPendente">R$ 0,00</div><div class="cp-qtd" id="cpPendenteQtd">0 contas</div></div>
+        <div class="cp-card c-verde" onclick="filtrarFinanceiro('pago')"><small>Pago no mês</small><div class="cp-val" id="cpPago">R$ 0,00</div><div class="cp-qtd" id="cpPagoQtd">0 contas</div></div>
       </div>
+
+      <div class="cp-filtros" id="cpFiltros">
+        <button class="cp-filtro" data-f="pendentes" onclick="filtrarFinanceiro('pendentes')">Pendentes</button>
+        <button class="cp-filtro" data-f="vencido" onclick="filtrarFinanceiro('vencido')">Vencidas</button>
+        <button class="cp-filtro" data-f="hoje" onclick="filtrarFinanceiro('hoje')">Hoje</button>
+        <button class="cp-filtro" data-f="amanha" onclick="filtrarFinanceiro('amanha')">Amanhã</button>
+        <button class="cp-filtro" data-f="semana" onclick="filtrarFinanceiro('semana')">Esta semana</button>
+        <button class="cp-filtro" data-f="prox15" onclick="filtrarFinanceiro('prox15')">Próximos 15 dias</button>
+        <button class="cp-filtro" data-f="mes" onclick="filtrarFinanceiro('mes')">Este mês</button>
+        <button class="cp-filtro" data-f="pago" onclick="filtrarFinanceiro('pago')">Pagas</button>
+        <button class="cp-filtro" data-f="todos" onclick="filtrarFinanceiro('todos')">Todas</button>
+      </div>
+
+      <div style="margin:10px 0"><input id="cpBusca" class="inline-input" style="max-width:340px" placeholder="Buscar por descrição..." oninput="renderFinanceiro(window.filtroAtual||'pendentes')"></div>
+
       <table class="finance-table">
-        <thead><tr><th>Data</th><th style="min-width:300px">Descrição</th><th>Tipo</th><th>Valor</th><th>Status</th><th>Parcela</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Vencimento</th><th style="min-width:280px">Descrição</th><th>Tipo</th><th>Valor</th><th>Status</th><th>Parcela</th><th>Ação</th></tr></thead>
         <tbody id="listaContasPagar"></tbody>
       </table>
       <div class="total-box" style="margin-top:16px">
@@ -575,11 +599,12 @@ function limparOrcamentosAntigos(){
 
 function statusAutomaticoConta(c){
   if(c.status === 'Pago') return 'Pago';
+  const semValor = (c.valor===null || c.valor===undefined || c.valor==='' || Number(c.valor)===0);
+  if(semValor){ c.status='Aguardando valor'; return 'Aguardando valor'; }
   const hoje = dataHojeISO();
-  if(c.data && String(c.data).slice(0,10) < hoje) {
-    c.status = 'Vencido';
-    return 'Vencido';
-  }
+  const dataConta = String(c.data||'').slice(0,10);
+  if(dataConta && dataConta < hoje){ c.status='Vencido'; return 'Vencido'; }
+  if(dataConta && dataConta === hoje){ c.status='Vence hoje'; return 'Vence hoje'; }
   c.status = 'A vencer';
   return 'A vencer';
 }
@@ -1590,7 +1615,10 @@ function contaPassaFiltro(c,filtro){
     const dataConta = String(c.data||'').slice(0,10);
     return inicio && fim && dataConta >= inicio && dataConta <= fim;
   }
+  if(filtro==='pendentes')return c.status!=='Pago';
   if(filtro==='hoje')return isSameDay(d,hoje);
+  if(filtro==='amanha'){const am=new Date(hoje);am.setDate(hoje.getDate()+1);return isSameDay(d,am);}
+  if(filtro==='prox15'){if(c.status==='Pago'||!d)return false;const fim=new Date(hoje);fim.setDate(hoje.getDate()+15);return startOfDay(d)>=startOfDay(hoje)&&startOfDay(d)<=startOfDay(fim);}
   if(filtro==='semana')return isSameWeek(d,hoje);
   if(filtro==='mes')return isSameMonth(d,hoje);
   if(filtro==='mensal')return c.tipo==='Mensal';
@@ -1600,23 +1628,46 @@ function contaPassaFiltro(c,filtro){
   if(filtro==='avencer')return c.status==='A vencer';
   return true
 }
-function renderFinanceiro(filtro='todos'){
+function renderFinanceiro(filtro='pendentes'){
   if(!document.getElementById('listaContasPagar'))return;
   finance.forEach(statusAutomaticoConta);
   finance.sort((a,b)=>String(a.data||'9999-12-31').localeCompare(String(b.data||'9999-12-31')));
+
+  const hoje=new Date();
+  let vVenc=0,qVenc=0,vHoje=0,qHoje=0,vSem=0,qSem=0,vAve=0,qAve=0,vPend=0,qPend=0,vPagoMes=0,qPagoMes=0;
+  finance.forEach(c=>{
+    const st=statusAutomaticoConta(c), val=Number(c.valor||0), d=parseDateLocal(c.data);
+    if(st==='Vencido'){vVenc+=val;qVenc++;}
+    if(st==='Vence hoje'){vHoje+=val;qHoje++;}
+    if(st==='A vencer'){vAve+=val;qAve++;}
+    if(st!=='Pago'){vPend+=val;qPend++; if(d&&isSameWeek(d,hoje)){vSem+=val;qSem++;}}
+    if(st==='Pago'&&d&&isSameMonth(d,hoje)){vPagoMes+=val;qPagoMes++;}
+  });
+  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
+  setTxt('cpVencidas',moeda(vVenc)); setTxt('cpVencidasQtd',qVenc+' contas');
+  setTxt('cpHoje',moeda(vHoje)); setTxt('cpHojeQtd',qHoje+' contas');
+  setTxt('cpSemana',moeda(vSem)); setTxt('cpSemanaQtd',qSem+' contas');
+  setTxt('cpAvencer',moeda(vAve)); setTxt('cpAvencerQtd',qAve+' contas');
+  setTxt('cpPendente',moeda(vPend)); setTxt('cpPendenteQtd',qPend+' contas');
+  setTxt('cpPago',moeda(vPagoMes)); setTxt('cpPagoQtd',qPagoMes+' contas');
+  document.querySelectorAll('#cpFiltros .cp-filtro').forEach(b=>b.classList.toggle('ativo', b.dataset.f===filtro));
+  const busca=(document.getElementById('cpBusca')?.value||'').trim().toLowerCase();
+
   listaContasPagar.innerHTML='';
   let totalDoFiltro = 0;
   let encontrouAlgum = false;
 
   finance.forEach((c,i)=>{
     if(!contaPassaFiltro(c,filtro))return;
+    if(busca && !String(c.descricao||'').toLowerCase().includes(busca))return;
 
     encontrouAlgum = true;
     totalDoFiltro += Number(c.valor||0);
 
     const parcela=(c.parcelaAtual||c.totalParcelas)?`${c.parcelaAtual||'-'}${c.totalParcelas?'/'+c.totalParcelas:''}`:'';
-    const classe = c.status==='Vencido' ? 'status-vencido' : c.status==='Pago' ? 'status-pago' : 'status-avencer';
     const statusTexto = statusAutomaticoConta(c);
+    const classe = statusTexto==='Vencido'?'status-vencido' : statusTexto==='Pago'?'status-pago' : statusTexto==='Vence hoje'?'status-vencehoje' : statusTexto==='Aguardando valor'?'status-aguardando' : 'status-avencer';
+    const badgeCor = statusTexto==='Pago'?'green' : statusTexto==='Vencido'?'red' : statusTexto==='Vence hoje'?'orange' : statusTexto==='Aguardando valor'?'gray' : '';
 
     listaContasPagar.innerHTML += `<tr class="${classe}">
       <td><input class="inline-input" type="date" value="${c.data||''}" onchange="alterarCampoConta(${i},'data',this.value)"></td>
@@ -1624,7 +1675,7 @@ function renderFinanceiro(filtro='todos'){
       <td><select onchange="alterarCampoConta(${i},'tipo',this.value)"><option ${c.tipo==='Mensal'?'selected':''}>Mensal</option><option ${c.tipo==='Variável'?'selected':''}>Variável</option><option ${c.tipo==='Semanal'?'selected':''}>Semanal</option></select></td>
       <td><div class="valor-wrap"><span>R$</span><input class="inline-input" type="number" step="0.01" value="${Number(c.valor||0).toFixed(2)}" onchange="alterarCampoConta(${i},'valor',this.value)"></div></td>
       <td>
-        <span class="badge ${statusTexto==='Vencido'?'red':statusTexto==='Pago'?'green':''}">${statusTexto}</span><br>
+        <span class="badge ${badgeCor}">${statusTexto}</span><br>
         ${statusTexto==='Pago' ? '<small>Pago</small>' : `<button class="green" style="margin-top:5px;padding:6px 8px" onclick="marcarContaPaga(${i})">Marcar pago</button>`}
       </td>
       <td><input class="inline-input" value="${parcela}" onchange="alterarParcelaConta(${i},this.value)"></td>
@@ -1633,17 +1684,20 @@ function renderFinanceiro(filtro='todos'){
   });
 
   if(!encontrouAlgum){
-    listaContasPagar.innerHTML='<tr><td colspan="7" class="muted">Nenhum pagamento encontrado para esse filtro.</td></tr>';
+    listaContasPagar.innerHTML='<tr><td colspan="7" class="muted">Nenhuma conta encontrada para esse filtro.</td></tr>';
   }
 
   const nomesFiltro = {
-    todos:'Total de todos os boletos/pagamentos',
-    hoje:'Total para pagar hoje',
-    semana:'Total para pagar esta semana',
-    mes:'Total para pagar este mês',
-    vencido:'Total de contas vencidas',
-    avencer:'Total de contas a vencer',
-    pago:'Total de contas pagas',
+    todos:'Total de todas as contas',
+    pendentes:'Total das contas pendentes',
+    hoje:'Total que vence hoje',
+    amanha:'Total que vence amanhã',
+    semana:'Total desta semana',
+    prox15:'Total dos próximos 15 dias',
+    mes:'Total deste mês',
+    vencido:'Total das contas vencidas',
+    avencer:'Total das contas a vencer',
+    pago:'Total das contas pagas',
     mensal:'Total dos custos mensais',
     variavel:'Total dos custos variáveis',
     dataEspecifica:'Total da data selecionada', periodo:'Total do período selecionado'
@@ -1656,6 +1710,11 @@ function renderFinanceiro(filtro='todos'){
   renderSaidas();
   atualizarResumoFinanceiro(filtro);
   salvarDados();
+}
+function abrirNovaConta(){
+  finance.push({id:Date.now()+Math.floor(Math.random()*100000), data:dataHojeISO(), descricao:'Nova conta', tipo:'Mensal', valor:0, status:'Aguardando valor', origem:'Manual'});
+  filtrarFinanceiro('pendentes');
+  salvarAgora();
 }
 function marcarContaPaga(i){
   finance[i].status='Pago';
