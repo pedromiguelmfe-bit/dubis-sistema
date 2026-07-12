@@ -750,7 +750,10 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
   </div>
 
   <div class="panel">
-    <h3>Clientes cadastrados</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <h3>Clientes cadastrados</h3>
+      <input id="clBusca" class="inline-input" style="max-width:260px" placeholder="Buscar cliente por nome..." oninput="renderClientes()">
+    </div>
     <div id="listaClientes"></div>
   </div>
 </section>
@@ -1150,32 +1153,37 @@ function atualizarTotalAtual(){
 function cancelarOrcamento(){formOrcamento.style.display='none'; editingQuoteId=null}
 
 
+function _normalizarTexto(t){
+  return (t||'').trim().toLowerCase().replace(/\s+/g,' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
 function salvarClienteBasicoDoOrcamento(q){
-  const nome = (q.cliente||'').trim().toLowerCase();
-  const placa = (q.placa||'').trim().toLowerCase();
-  const existe = clients.some(c => (c.nome||'').trim().toLowerCase()===nome && (
-    (c.placa||'').trim().toLowerCase()===placa ||
-    (c.placa2||'').trim().toLowerCase()===placa ||
-    (c.placa3||'').trim().toLowerCase()===placa
-  ));
-  if(!existe){
-    clients.push({
-      id: Date.now()+Math.floor(Math.random()*1000),
-      nome: q.cliente || '',
-      cpf: '',
-      tel: '',
-      email: '',
-      end: '',
-      nasc: '',
-      veiculo: q.veiculo || '',
-      placa: q.placa || '',
-      veiculo2: '',
-      placa2: '',
-      veiculo3: '',
-      placa3: '',
-      cadastroBasico: true
-    });
+  const nomeNorm = _normalizarTexto(q.cliente);
+  const placaNorm = (q.placa||'').trim().toUpperCase();
+
+  let cliente = clients.find(c => _normalizarTexto(c.nome)===nomeNorm && nomeNorm);
+  if(!cliente && placaNorm){
+    cliente = clients.find(c => [c.placa,c.placa2,c.placa3].some(p=>(p||'').trim().toUpperCase()===placaNorm));
   }
+
+  if(!cliente){
+    cliente = {
+      id: Date.now()+Math.floor(Math.random()*1000),
+      nome: q.cliente || '', cpf:'', tel:'', email:'', end:'', nasc:'', obs:'',
+      veiculo: q.veiculo || '', placa: q.placa || '',
+      veiculo2:'', placa2:'', veiculo3:'', placa3:'',
+      cadastroBasico: true
+    };
+    clients.push(cliente);
+  } else if(placaNorm){
+    // cliente já existe: se esse veículo ainda não está cadastrado, guarda no próximo slot livre
+    const jaTemPlaca = [cliente.placa,cliente.placa2,cliente.placa3].some(p=>(p||'').trim().toUpperCase()===placaNorm);
+    if(!jaTemPlaca){
+      if(!cliente.placa){ cliente.placa=q.placa||''; cliente.veiculo=q.veiculo||''; }
+      else if(!cliente.placa2){ cliente.placa2=q.placa||''; cliente.veiculo2=q.veiculo||''; }
+      else if(!cliente.placa3){ cliente.placa3=q.placa||''; cliente.veiculo3=q.veiculo||''; }
+    }
+  }
+  return cliente.id;
 }
 
 function salvarCliente(){
@@ -1228,10 +1236,12 @@ function excluirCliente(id){
 /* ===== Histórico de Serviços do cliente ===== */
 function _servicosDoClienteObj(c){
   if(!c) return [];
-  const nomeNorm=(c.nome||'').trim().toLowerCase();
+  const nomeNorm=_normalizarTexto(c.nome);
   const placas=[c.placa,c.placa2,c.placa3].map(p=>(p||'').trim().toUpperCase()).filter(Boolean);
   return servicosConcluidos.filter(s=>{
-    const nomeS=(s.cliente||'').trim().toLowerCase();
+    if(s.clientId){ return String(s.clientId)===String(c.id); }
+    // fallback para registros antigos, gerados antes do vínculo por ID existir
+    const nomeS=_normalizarTexto(s.cliente);
     const placaS=(s.placa||'').trim().toUpperCase();
     return (nomeS && nomeS===nomeNorm) || (placaS && placas.includes(placaS));
   }).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
@@ -1415,8 +1425,11 @@ function adicionarItemDoCatalogo(id){
 
 function renderClientes(){
   if(!document.getElementById('listaClientes'))return;
-  const ordenados=[...clients].sort((a,b)=>(a.nome||'').localeCompare((b.nome||''),'pt',{sensitivity:'base'}));
-  if(ordenados.length===0){ listaClientes.innerHTML='<p class="muted">Nenhum cliente cadastrado ainda.</p>'; return; }
+  const busca=_normalizarTexto(document.getElementById('clBusca')?.value||'');
+  const ordenados=[...clients]
+    .filter(c=>!busca || _normalizarTexto(c.nome).includes(busca))
+    .sort((a,b)=>(a.nome||'').localeCompare((b.nome||''),'pt',{sensitivity:'base'}));
+  if(ordenados.length===0){ listaClientes.innerHTML='<p class="muted">Nenhum cliente encontrado.</p>'; return; }
   listaClientes.innerHTML = ordenados.map(c=>{
     const veics=todosVeiculosCliente(c).map(v=>`${escapeHtml(v.veiculo||'-')} (${escapeHtml(v.placa||'-')})`).join(' · ') || '-';
     const badge = c.cadastroBasico ? '<span class="badge" style="background:#fef3c7;color:#92400e">Cadastro incompleto</span>' : '<span class="badge green">Completo</span>';
@@ -1435,17 +1448,17 @@ function finalizarOrcamento(){
   if(!qCliente.value){alert('Informe o nome do cliente.');return}
   if(currentItems.length===0){alert('Adicione pelo menos um item.');return}
   const data={cliente:qCliente.value, placa:qPlaca.value, veiculo:qVeiculo.value, km:qKm.value.trim(), obs:qObs.value.trim(), items:JSON.parse(JSON.stringify(currentItems)), total:totalItens(currentItems)};
+  data.clientId = salvarClienteBasicoDoOrcamento(data);
   if(editingQuoteId){
     const q=quotes.find(x=>x.id===editingQuoteId);
     if(q) Object.assign(q,data);
   } else {
     quotes.push({id:Date.now(), number:String(quotes.length+1).padStart(4,'0'), createdAt:new Date().toISOString().slice(0,10), status:'Aberto', ...data});
   }
-  salvarClienteBasicoDoOrcamento(data);
   if(editingQuoteId){
     const os = serviceOrders.find(o=>o.quoteId===editingQuoteId);
     if(os){
-      os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.km=data.km; os.obs=data.obs; os.items=JSON.parse(JSON.stringify(data.items)); os.total=data.total;
+      os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.km=data.km; os.obs=data.obs; os.clientId=data.clientId; os.items=JSON.parse(JSON.stringify(data.items)); os.total=data.total;
     }
   }
   formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard(); salvarAgora();
@@ -1493,6 +1506,7 @@ function aprovarOrcamento(id){
       placa:q.placa,
       km:q.km||'',
       obs:q.obs||'',
+      clientId:q.clientId||null,
       total:q.total,
       status:'Aprovado',
       items:JSON.parse(JSON.stringify(q.items||[])),
@@ -1500,7 +1514,7 @@ function aprovarOrcamento(id){
       createdAt:q.createdAt
     });
   }
-  renderQuotes(); renderOS(); atualizarDashboard(); salvarDados();
+  renderQuotes(); renderOS(); atualizarDashboard(); salvarAgora();
 }
 function renderOS(){
   listaOS.innerHTML='';
@@ -1562,6 +1576,7 @@ function receberOS(i, forma){
     placa:o.placa,
     km:o.km||'',
     obs:o.obs||'',
+    clientId:o.clientId||null,
     total:o.total,
     forma:forma,
     funcionario: func ? func.nome : '',
