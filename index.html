@@ -207,6 +207,8 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <div><label>Nome do cliente</label><input id="qCliente" placeholder="Nome do cliente"></div>
       <div><label>Placa</label><input id="qPlaca" placeholder="ABC1D23"></div>
       <div><label>Veículo / modelo</label><input id="qVeiculo" placeholder="Ex: Gol, Onix, Corolla"></div>
+      <div><label>Quilometragem (opcional)</label><input id="qKm" placeholder="Ex: 82.500 km"></div>
+      <div style="grid-column:1/-1"><label>Observações do serviço (opcional)</label><input id="qObs" placeholder="Ex: cliente relatou barulho na suspensão dianteira"></div>
       <div style="grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button class="gray" onclick="buscarSugestoesOrcamento()">Buscar cliente cadastrado</button>
         <small class="muted">A placa é só texto. O sistema não preenche nada sozinho — a busca só acontece quando você clica.</small>
@@ -693,6 +695,19 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <button class="gray" onclick="limparFormularioCliente()">Cancelar / Limpar</button>
     </div>
   </div>
+
+  <div class="panel" id="historicoClientePanel" style="display:none">
+    <h3>Histórico de Serviços</h3>
+    <div class="cp-cards" style="grid-template-columns:repeat(5,1fr)">
+      <div class="cp-card c-preto"><small>Total de OS</small><div class="cp-val" id="hcTotalOS">0</div></div>
+      <div class="cp-card c-verde"><small>Valor total gasto</small><div class="cp-val" id="hcValorTotal">R$ 0,00</div></div>
+      <div class="cp-card c-amar"><small>Última visita</small><div class="cp-val" id="hcUltimaVisita">-</div></div>
+      <div class="cp-card c-laranja"><small>Último veículo</small><div class="cp-val" id="hcUltimoVeiculo">-</div></div>
+      <div class="cp-card c-cinza"><small>Veículos cadastrados</small><div class="cp-val" id="hcQtdVeiculos">0</div></div>
+    </div>
+    <div id="hcLista" style="margin-top:14px"></div>
+  </div>
+
   <div class="panel">
     <h3>Clientes cadastrados</h3>
     <div id="listaClientes"></div>
@@ -1048,7 +1063,7 @@ function novoOrcamento(){
   btnFinalizarOrcamento.innerText='Finalizar orçamento';
   orcamentoEditandoAviso.innerHTML='';
   formOrcamento.style.display='block';
-  qCliente.value=''; qPlaca.value=''; qVeiculo.value=''; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
+  qCliente.value=''; qPlaca.value=''; qVeiculo.value=''; qKm.value=''; qObs.value=''; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
   currentItems=[]; addLinhaItem();
 }
 
@@ -1136,7 +1151,7 @@ function salvarCliente(){
     clients.push({id:Date.now()+Math.floor(Math.random()*1000), ...dados});
   }
   limparFormularioCliente();
-  renderClientes(); atualizarDashboard(); salvarDados();
+  renderClientes(); atualizarDashboard(); salvarAgora();
 }
 function limparFormularioCliente(){
   editingClientId=null;
@@ -1144,6 +1159,7 @@ function limparFormularioCliente(){
   if(document.getElementById('clienteTitulo')) clienteTitulo.innerText='Cadastro completo de clientes';
   if(document.getElementById('btnSalvarCliente')) btnSalvarCliente.innerText='Salvar cliente';
   if(document.getElementById('clienteAviso')) clienteAviso.innerHTML='';
+  if(document.getElementById('historicoClientePanel')) historicoClientePanel.style.display='none';
 }
 function editarCliente(id){
   const c=clients.find(x=>String(x.id)===String(id)); if(!c)return;
@@ -1156,6 +1172,7 @@ function editarCliente(id){
   if(document.getElementById('clienteTitulo')) clienteTitulo.innerText='Editando: '+(c.nome||'cliente');
   if(document.getElementById('btnSalvarCliente')) btnSalvarCliente.innerText='Salvar alterações';
   if(document.getElementById('clienteAviso')) clienteAviso.innerHTML = c.cadastroBasico ? '<div class="editing">Cadastro incompleto — complete os dados abaixo e salve.</div>' : '';
+  renderHistoricoCliente(c);
   if(document.getElementById('clienteTitulo')) clienteTitulo.scrollIntoView({behavior:'smooth'});
 }
 function excluirCliente(id){
@@ -1163,6 +1180,69 @@ function excluirCliente(id){
   clients=clients.filter(x=>String(x.id)!==String(id));
   renderClientes(); atualizarDashboard(); salvarAgora();
 }
+
+/* ===== Histórico de Serviços do cliente ===== */
+function _servicosDoClienteObj(c){
+  if(!c) return [];
+  const nomeNorm=(c.nome||'').trim().toLowerCase();
+  const placas=[c.placa,c.placa2,c.placa3].map(p=>(p||'').trim().toUpperCase()).filter(Boolean);
+  return servicosConcluidos.filter(s=>{
+    const nomeS=(s.cliente||'').trim().toLowerCase();
+    const placaS=(s.placa||'').trim().toUpperCase();
+    return (nomeS && nomeS===nomeNorm) || (placaS && placas.includes(placaS));
+  }).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+}
+function renderHistoricoCliente(c){
+  const painel=document.getElementById('historicoClientePanel');
+  if(!painel)return;
+  if(!c){ painel.style.display='none'; return; }
+  painel.style.display='block';
+
+  const servicos=_servicosDoClienteObj(c);
+  const totalOS=servicos.length;
+  const valorTotal=servicos.reduce((s,x)=>s+Number(x.total||0),0);
+  const ultima=servicos[0];
+  const qtdVeiculos=todosVeiculosCliente(c).length;
+
+  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
+  setTxt('hcTotalOS', totalOS);
+  setTxt('hcValorTotal', moeda(valorTotal));
+  setTxt('hcUltimaVisita', ultima ? dataBR(ultima.data) : '-');
+  setTxt('hcUltimoVeiculo', ultima ? (ultima.veiculo||'-')+' ('+(ultima.placa||'-')+')' : '-');
+  setTxt('hcQtdVeiculos', qtdVeiculos);
+
+  const lista=document.getElementById('hcLista');
+  if(!lista)return;
+  if(servicos.length===0){
+    lista.innerHTML='<p class="muted">Nenhuma Ordem de Serviço concluída ainda para este cliente.</p>';
+    return;
+  }
+  lista.innerHTML = servicos.map(s=>`<div class="client-card">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <strong>OS #${escapeHtml(String(s.quoteId||s.id))}</strong>
+        <span class="badge green">Concluído</span>
+      </div>
+      <small>Data: ${dataBR(s.data)} | Veículo: ${escapeHtml(s.veiculo||'-')} | Placa: ${escapeHtml(s.placa||'-')}${s.km?(' | Km: '+escapeHtml(s.km)):''}</small><br>
+      <small>Valor total: <strong>${moeda(s.total)}</strong> | Funcionário: ${escapeHtml(s.funcionario||'-')} | Forma de pagamento: ${escapeHtml(s.forma||'-')}</small>
+      ${s.obs?`<br><small>Observações: ${escapeHtml(s.obs)}</small>`:''}
+      <div class="actions">
+        <button onclick="abrirDetalheOS('${s.quoteId}')">Visualizar</button>
+        <button onclick="gerarPDFConcluido(${s.id})">Gerar PDF novamente</button>
+        <button onclick="gerarPDFConcluido(${s.id})">Imprimir</button>
+        <button class="dark" onclick="duplicarServicoParaOrcamento(${s.id})">Duplicar p/ novo orçamento</button>
+      </div>
+    </div>`).join('');
+}
+function duplicarServicoParaOrcamento(sId){
+  const s=servicosConcluidos.find(x=>x.id===sId); if(!s)return;
+  abrirPorId('orcamentos');
+  novoOrcamento();
+  qCliente.value=s.cliente||''; qPlaca.value=s.placa||''; qVeiculo.value=s.veiculo||'';
+  currentItems = JSON.parse(JSON.stringify(s.items&&s.items.length ? s.items : [{desc:'',qtd:1,valorBruto:'',lucroPct:'',valor:0}]));
+  renderItens(); atualizarTotalAtual();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 function renderClientes(){
   if(!document.getElementById('listaClientes'))return;
   const ordenados=[...clients].sort((a,b)=>(a.nome||'').localeCompare((b.nome||''),'pt',{sensitivity:'base'}));
@@ -1184,7 +1264,7 @@ function renderClientes(){
 function finalizarOrcamento(){
   if(!qCliente.value){alert('Informe o nome do cliente.');return}
   if(currentItems.length===0){alert('Adicione pelo menos um item.');return}
-  const data={cliente:qCliente.value, placa:qPlaca.value, veiculo:qVeiculo.value, items:JSON.parse(JSON.stringify(currentItems)), total:totalItens(currentItems)};
+  const data={cliente:qCliente.value, placa:qPlaca.value, veiculo:qVeiculo.value, km:qKm.value.trim(), obs:qObs.value.trim(), items:JSON.parse(JSON.stringify(currentItems)), total:totalItens(currentItems)};
   if(editingQuoteId){
     const q=quotes.find(x=>x.id===editingQuoteId);
     if(q) Object.assign(q,data);
@@ -1195,7 +1275,7 @@ function finalizarOrcamento(){
   if(editingQuoteId){
     const os = serviceOrders.find(o=>o.quoteId===editingQuoteId);
     if(os){
-      os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.items=JSON.parse(JSON.stringify(data.items)); os.total=data.total;
+      os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.km=data.km; os.obs=data.obs; os.items=JSON.parse(JSON.stringify(data.items)); os.total=data.total;
     }
   }
   formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard(); salvarAgora();
@@ -1208,7 +1288,7 @@ function editarOrcamento(id){
   btnFinalizarOrcamento.innerText='Salvar alterações do orçamento';
   orcamentoEditandoAviso.innerHTML='<div class="editing">Você está editando esse orçamento. Altere os campos e salve.</div>';
   formOrcamento.style.display='block';
-  qCliente.value=q.cliente; qPlaca.value=q.placa; qVeiculo.value=q.veiculo; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
+  qCliente.value=q.cliente; qPlaca.value=q.placa; qVeiculo.value=q.veiculo; qKm.value=q.km||''; qObs.value=q.obs||''; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
   currentItems=JSON.parse(JSON.stringify(q.items||[]));
   renderItens(); atualizarTotalAtual();
   window.scrollTo({top:0,behavior:'smooth'});
@@ -1241,6 +1321,8 @@ function aprovarOrcamento(id){
       cliente:q.cliente,
       veiculo:q.veiculo,
       placa:q.placa,
+      km:q.km||'',
+      obs:q.obs||'',
       total:q.total,
       status:'Aprovado',
       items:JSON.parse(JSON.stringify(q.items||[])),
@@ -1308,6 +1390,8 @@ function receberOS(i, forma){
     cliente:o.cliente,
     veiculo:o.veiculo,
     placa:o.placa,
+    km:o.km||'',
+    obs:o.obs||'',
     total:o.total,
     forma:forma,
     funcionario: func ? func.nome : '',
