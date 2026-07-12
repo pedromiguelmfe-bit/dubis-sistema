@@ -266,6 +266,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <button onclick="abrirFinanceiro('finPagamentos', this)">Pagamentos</button>
       <button onclick="abrirFinanceiro('finEntradas', this)">Entradas</button>
       <button onclick="abrirFinanceiro('finSaidas', this)">Saídas</button>
+      <button onclick="abrirFinanceiro('finMovimentacoes', this)">Movimentações e Resultados</button>
       <button class="dark" onclick="gerarRelatorioMensal()">Relatório mensal PDF</button>
     </div>
   </div>
@@ -551,6 +552,70 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       </table>
     </div>
   </div>
+
+  <div id="finMovimentacoes" class="finance-subsection">
+    <div class="panel">
+      <div class="cp-topo">
+        <div>
+          <h3>Movimentações e Resultados</h3>
+          <p class="muted">Todas as entradas e saídas juntas — manuais, de serviços concluídos e contas pagas — com o resultado do período calculado sozinho.</p>
+        </div>
+      </div>
+
+      <div class="cp-toolbar">
+        <div class="cp-calendario-wrap">
+          <button class="gray" onclick="mrAbrirCalendario()">Calendário</button>
+          <div class="cp-calendario-popover" id="mrCalendarioPopover" style="display:none">
+            <label>Data específica</label>
+            <input id="mrDataEspecifica" type="date">
+            <div class="actions" style="margin:8px 0;justify-content:flex-start"><button class="dark" onclick="mrAplicarDataEspecifica()">Filtrar esse dia</button></div>
+            <hr>
+            <label>Período</label>
+            <div style="display:flex;gap:6px">
+              <input id="mrPeriodoInicio" type="date">
+              <input id="mrPeriodoFim" type="date">
+            </div>
+            <div class="actions" style="margin-top:8px;justify-content:flex-start"><button class="dark" onclick="mrAplicarPeriodo()">Filtrar período</button></div>
+            <div class="actions" style="margin-top:10px;justify-content:space-between">
+              <button class="gray" onclick="mrLimparFiltroData()">Limpar</button>
+              <button class="gray" onclick="mrFecharCalendario()">Fechar</button>
+            </div>
+          </div>
+        </div>
+        <div class="cp-meses-barra" id="mrMesesBarra"></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 10px">
+        <input id="mrBusca" class="inline-input" style="max-width:260px" placeholder="Buscar por descrição..." oninput="renderMovimentacoes()">
+        <select id="mrFiltroTipo" class="inline-input" style="max-width:150px" onchange="renderMovimentacoes()"><option value="">Entradas e saídas</option><option value="Entrada">Só entradas</option><option value="Saída">Só saídas</option></select>
+        <input id="mrFiltroBanco" class="inline-input" style="max-width:170px" placeholder="Banco/conta" oninput="renderMovimentacoes()">
+        <select id="mrFiltroForma" class="inline-input" style="max-width:170px" onchange="renderMovimentacoes()">
+          <option value="">Qualquer forma</option>
+          <option>PIX</option><option>DINHEIRO</option><option>CARTÃO</option><option>TRANSFERÊNCIA</option><option>Boleto</option>
+        </select>
+      </div>
+
+      <table class="finance-table">
+        <thead><tr><th>Data</th><th style="min-width:220px">Descrição</th><th>Categoria</th><th>Tipo</th><th>Banco</th><th>Forma</th><th>Valor bruto</th><th>Valor líquido</th><th>Situação</th></tr></thead>
+        <tbody id="listaMovimentacoes"></tbody>
+      </table>
+
+      <div class="cp-resumo">
+        <h4 id="mrResumoTitulo">Resultado do período</h4>
+        <div class="cp-resumo-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div><small>Total de entradas</small><div id="mrTotalEntradas">R$ 0,00</div></div>
+          <div><small>Total de saídas</small><div id="mrTotalSaidas">R$ 0,00</div></div>
+          <div><small>Total pago em contas</small><div id="mrTotalContasPagas">R$ 0,00</div></div>
+          <div><small>Total gasto com peças</small><div id="mrTotalPecas">R$ 0,00</div></div>
+          <div><small>Recebido de serviços concluídos</small><div id="mrTotalServicos">R$ 0,00</div></div>
+          <div><small>Taxas e descontos</small><div id="mrTotalTaxas">R$ 0,00</div></div>
+          <div><small>Lucro bruto</small><div id="mrLucroBruto">R$ 0,00</div></div>
+          <div><small>Lucro líquido</small><div id="mrLucroLiquido">R$ 0,00</div></div>
+          <div><small>Saldo final</small><div id="mrSaldoFinal">R$ 0,00</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 <section id="estoque" class="section"><div class="panel"><h3>Estoque</h3><p class="muted">Próxima etapa: cadastrar peças, serviços e mão de obra para puxar no orçamento.</p></div></section>
 <section id="fornecedores" class="section"><div class="panel"><h3>Fornecedores</h3><p class="muted">Módulo reservado.</p></div></section>
@@ -832,7 +897,7 @@ async function iniciarApp(){
 function renderTudo(){
   limparOrcamentosAntigos();
   renderQuotes(); renderOS(); renderFinanceiro('todos'); renderEntradas();
-  renderSaidas(); renderClientes(); renderFuncionarios(); renderConcluidos();
+  renderSaidas(); renderClientes(); renderFuncionarios(); renderConcluidos(); renderMovimentacoes();
   atualizarDashboard();
 }
 function abrir(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');titulo.innerText={dashboard:'Dashboard',orcamentos:'Orçamentos',os:'Ordens de Serviço',concluidos:'Serviços Concluídos',financeiro:'Financeiro',estoque:'Estoque',fornecedores:'Fornecedores',funcionarios:'Funcionários',clientes:'Clientes'}[id]}
@@ -859,7 +924,7 @@ function abrirFinanceiro(id,btn){
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.finance-tabs button').forEach(b=>b.classList.remove('activeTab'));
   if(btn)btn.classList.add('activeTab');
-  renderFinanceiro(window.filtroAtual||'todos'); renderEntradas(); renderSaidas(); atualizarResumoFinanceiro(window.filtroAtual||'todos');
+  renderFinanceiro(window.filtroAtual||'todos'); renderEntradas(); renderSaidas(); renderMovimentacoes(); atualizarResumoFinanceiro(window.filtroAtual||'todos');
 }
 
 function atualizarDashboard(){
@@ -2501,6 +2566,7 @@ function renderEntradas(){
   } else {
     visiveis.forEach(e=>{ tabela.innerHTML += _linhaEntradaHtml(e, entradas.indexOf(e)); });
   }
+  if(typeof renderMovimentacoes==='function') renderMovimentacoes();
 }
 
 function alterarCampoEntrada(i,campo,valor){
@@ -2541,7 +2607,182 @@ function renderSaidas(){
   if(!document.getElementById('listaSaidas'))return;
   listaSaidas.innerHTML='';
   saidas.forEach((s,i)=>{listaSaidas.innerHTML += `<tr><td>${dataBR(s.data)}</td><td>${escapeHtml(s.descricao)}</td><td>${escapeHtml(s.categoria||'-')}</td><td>${moeda(s.valor)}</td><td><button class="red" onclick="excluirSaida(${i})">Excluir</button></td></tr>`});
+  if(typeof renderMovimentacoes==='function') renderMovimentacoes();
 }
+/* ===== Movimentações e Resultados (Fase C) ===== */
+function _movimentacoesUnificadas(){
+  const itens=[];
+  entradas.forEach(e=>itens.push({
+    tipo:'Entrada', data:e.data, descricao:e.descricao||'',
+    categoria: e.origem==='Ordem de Serviço' ? 'Serviço concluído' : 'Entrada',
+    banco:e.banco||'', forma:e.forma||'',
+    valorBruto:Number(e.valor||0), valorLiquido:Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),
+    situacao:e.situacao||'Recebido', origemDetalhe:e.origem||'Manual'
+  }));
+  saidas.forEach(s=>itens.push({
+    tipo:'Saída', data:s.data, descricao:s.descricao||'',
+    categoria: s.categoria || (s.origem==='ContaPaga' ? 'Conta paga' : 'Saída'),
+    banco:s.contaCaixa||'', forma:s.formaPagamento||'',
+    valorBruto:Number(s.valor||0), valorLiquido:Number(s.valor||0),
+    situacao:'Realizada', origemDetalhe:s.origem||'Manual'
+  }));
+  return itens;
+}
+function renderBarraMesesMovimentacoes(){
+  const cont=document.getElementById('mrMesesBarra');
+  if(!cont)return;
+  const atual=mesAtualISO();
+  if(!window.mesSelecionadoMovimentacoes) window.mesSelecionadoMovimentacoes=atual;
+
+  const todos=_movimentacoesUnificadas();
+  const mesesComMovimento=new Set(todos.map(m=>String(m.data||'').slice(0,7)).filter(Boolean));
+  mesesComMovimento.add(atual);
+
+  const futurosOuAtual=[...mesesComMovimento].filter(m=>m>=atual).sort();
+  const temAntigas=[...mesesComMovimento].some(m=>m<atual);
+
+  let html='';
+  if(temAntigas){
+    const ativo = !window.mrFiltroData && window.mesSelecionadoMovimentacoes==='antigas';
+    html += `<button class="cp-mes-card ${ativo?'ativo':''}" onclick="selecionarMesMovimentacoes('antigas')">Movimentações Antigas</button>`;
+  }
+  futurosOuAtual.forEach(m=>{
+    const ativo = !window.mrFiltroData && window.mesSelecionadoMovimentacoes===m;
+    html += `<button class="cp-mes-card ${ativo?'ativo':''}" onclick="selecionarMesMovimentacoes('${m}')">${_mesLabelCurto(m,atual)}</button>`;
+  });
+  cont.innerHTML=html;
+}
+function selecionarMesMovimentacoes(valor){
+  window.mesSelecionadoMovimentacoes=valor;
+  window.mrFiltroData=null;
+  mrFecharCalendario();
+  renderMovimentacoes();
+}
+function mrAbrirCalendario(){ const el=document.getElementById('mrCalendarioPopover'); if(el) el.style.display='block'; }
+function mrFecharCalendario(){ const el=document.getElementById('mrCalendarioPopover'); if(el) el.style.display='none'; }
+function mrAplicarDataEspecifica(){
+  const v=document.getElementById('mrDataEspecifica').value;
+  if(!v){alert('Escolha uma data.');return}
+  window.mrFiltroData={tipo:'data', valor:v};
+  mrFecharCalendario();
+  renderMovimentacoes();
+}
+function mrAplicarPeriodo(){
+  const ini=document.getElementById('mrPeriodoInicio').value, fim=document.getElementById('mrPeriodoFim').value;
+  if(!ini||!fim){alert('Escolha a data inicial e a data final.');return}
+  if(ini>fim){alert('A data inicial deve ser anterior à data final.');return}
+  window.mrFiltroData={tipo:'periodo', inicio:ini, fim:fim};
+  mrFecharCalendario();
+  renderMovimentacoes();
+}
+function mrLimparFiltroData(){
+  window.mrFiltroData=null;
+  window.mesSelecionadoMovimentacoes=mesAtualISO();
+  mrFecharCalendario();
+  renderMovimentacoes();
+}
+function _linhaMovimentacaoHtml(m){
+  const corTipo = m.tipo==='Entrada' ? 'green' : 'red';
+  return `<tr>
+    <td>${dataBR(m.data)}</td>
+    <td>${escapeHtml(m.descricao)}</td>
+    <td>${escapeHtml(m.categoria)}</td>
+    <td><span class="badge ${corTipo}">${m.tipo}</span></td>
+    <td>${escapeHtml(m.banco||'-')}</td>
+    <td>${escapeHtml(m.forma||'-')}</td>
+    <td>${moeda(m.valorBruto)}</td>
+    <td>${moeda(m.valorLiquido)}</td>
+    <td>${escapeHtml(m.situacao)}</td>
+  </tr>`;
+}
+function renderMovimentacoes(){
+  const tabela=document.getElementById('listaMovimentacoes');
+  if(!tabela)return;
+
+  renderBarraMesesMovimentacoes();
+
+  const busca=(document.getElementById('mrBusca')?.value||'').trim().toLowerCase();
+  const filtroTipo=document.getElementById('mrFiltroTipo')?.value||'';
+  const filtroBanco=(document.getElementById('mrFiltroBanco')?.value||'').trim().toLowerCase();
+  const filtroForma=document.getElementById('mrFiltroForma')?.value||'';
+  const filtroData=window.mrFiltroData;
+
+  const todos=_movimentacoesUnificadas();
+  let periodo, tituloPeriodo, modoAntigas=false;
+
+  if(filtroData){
+    periodo = todos.filter(m=>{
+      const d=String(m.data||'').slice(0,10);
+      if(filtroData.tipo==='data') return d===filtroData.valor;
+      if(filtroData.tipo==='periodo') return d && d>=filtroData.inicio && d<=filtroData.fim;
+      return true;
+    });
+    tituloPeriodo = filtroData.tipo==='data' ? ('Movimentações de '+dataBR(filtroData.valor)) : ('Movimentações de '+dataBR(filtroData.inicio)+' até '+dataBR(filtroData.fim));
+  } else if(window.mesSelecionadoMovimentacoes==='antigas'){
+    modoAntigas=true;
+    const atual=mesAtualISO();
+    periodo = todos.filter(m=>{ const mm=String(m.data||'').slice(0,7); return mm && mm<atual; });
+    tituloPeriodo='Movimentações antigas';
+  } else {
+    const mesRef=window.mesSelecionadoMovimentacoes||mesAtualISO();
+    periodo = todos.filter(m=>String(m.data||'').slice(0,7)===mesRef);
+    const lbl=_mesLabelPt(mesRef);
+    tituloPeriodo = lbl.charAt(0).toUpperCase()+lbl.slice(1);
+  }
+
+  // relatório automático: sempre sobre o período inteiro, antes dos filtros de tipo/banco/forma/busca
+  const totalEntradas = periodo.filter(m=>m.tipo==='Entrada').reduce((s,m)=>s+m.valorLiquido,0);
+  const totalSaidas = periodo.filter(m=>m.tipo==='Saída').reduce((s,m)=>s+m.valorLiquido,0);
+  const totalContasPagas = periodo.filter(m=>m.tipo==='Saída' && m.origemDetalhe==='ContaPaga').reduce((s,m)=>s+m.valorLiquido,0);
+  const totalPecas = periodo.filter(m=>m.tipo==='Saída' && /peça|peca/i.test(m.categoria||'')).reduce((s,m)=>s+m.valorLiquido,0);
+  const totalServicos = periodo.filter(m=>m.tipo==='Entrada' && m.origemDetalhe==='Ordem de Serviço').reduce((s,m)=>s+m.valorLiquido,0);
+  const totalTaxas = periodo.filter(m=>m.tipo==='Entrada').reduce((s,m)=>s+(m.valorBruto-m.valorLiquido),0);
+  const lucroBruto = totalEntradas - totalPecas;
+  const totalSaidasOutras = totalSaidas - totalPecas;
+  const lucroLiquido = lucroBruto - totalSaidasOutras;
+  const saldoFinal = totalEntradas - totalSaidas;
+
+  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
+  setTxt('mrResumoTitulo','Resultado — '+tituloPeriodo);
+  setTxt('mrTotalEntradas', moeda(totalEntradas));
+  setTxt('mrTotalSaidas', moeda(totalSaidas));
+  setTxt('mrTotalContasPagas', moeda(totalContasPagas));
+  setTxt('mrTotalPecas', moeda(totalPecas));
+  setTxt('mrTotalServicos', moeda(totalServicos));
+  setTxt('mrTotalTaxas', moeda(totalTaxas));
+  setTxt('mrLucroBruto', moeda(lucroBruto));
+  setTxt('mrLucroLiquido', moeda(lucroLiquido));
+  setTxt('mrSaldoFinal', moeda(saldoFinal));
+
+  // lista visível: aplica busca + filtros de tipo/banco/forma sobre o período
+  let visiveis = periodo.filter(m=>{
+    if(filtroTipo && m.tipo!==filtroTipo) return false;
+    if(filtroBanco && !String(m.banco||'').toLowerCase().includes(filtroBanco)) return false;
+    if(filtroForma && String(m.forma||'')!==filtroForma) return false;
+    if(busca && !String(m.descricao||'').toLowerCase().includes(busca)) return false;
+    return true;
+  });
+  visiveis.sort((a,b)=>String(a.data||'9999-12-31').localeCompare(String(b.data||'9999-12-31')));
+
+  tabela.innerHTML='';
+  if(visiveis.length===0){
+    tabela.innerHTML='<tr><td colspan="9" class="muted">Nenhuma movimentação encontrada.</td></tr>';
+  } else if(modoAntigas){
+    let grupoAtual=null;
+    visiveis.forEach(m=>{
+      const mesM=String(m.data||'').slice(0,7);
+      if(mesM!==grupoAtual){
+        grupoAtual=mesM;
+        const lbl=_mesLabelPt(mesM);
+        tabela.innerHTML += `<tr><td colspan="9" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
+      }
+      tabela.innerHTML += _linhaMovimentacaoHtml(m);
+    });
+  } else {
+    visiveis.forEach(m=>{ tabela.innerHTML += _linhaMovimentacaoHtml(m); });
+  }
+}
+
 function atualizarResumoFinanceiro(filtro='todos'){
   const contasFiltradas = finance.filter(c=>contaPassaFiltro(c,filtro));
   const hoje=new Date();
