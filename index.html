@@ -900,7 +900,7 @@ async function iniciarApp(){
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='block';
   await carregarDadosSalvos();
-  if(gerarPagamentosSemanais()) salvarDados();
+  if(gerarHorizontePagamentosSemanais(12)) salvarDados();
   if(gerarHorizonteRecorrentes(12)) salvarDados();
   renderTudo();
 }
@@ -1401,8 +1401,8 @@ function salvarFuncionario(){
     funcionarios.push({id:Date.now(), ...dados});
   }
   limparFuncionario();
-  gerarPagamentosSemanais();
-  renderFuncionarios(); renderOS(); atualizarDashboard(); salvarDados();
+  gerarHorizontePagamentosSemanais(12);
+  renderFuncionarios(); renderOS(); atualizarDashboard(); salvarAgora();
 }
 
 function limparFuncionario(){
@@ -1455,16 +1455,16 @@ function _numeroSemanaISO(d){
   const week=1+Math.round((date-firstThursday)/(7*24*3600*1000));
   return date.getUTCFullYear()+'-W'+String(week).padStart(2,'0');
 }
-function _vencimentoSexta(d){
+function _vencimentoSabado(d){
   const date=new Date(d.getFullYear(),d.getMonth(),d.getDate());
-  const dayNum=(date.getDay()+6)%7;
-  date.setDate(date.getDate()-dayNum+4);
+  const dayNum=(date.getDay()+6)%7; // segunda=0 ... domingo=6
+  date.setDate(date.getDate()-dayNum+5); // sábado=5
   return date.toISOString().slice(0,10);
 }
-function gerarPagamentosSemanais(){
-  const hoje=new Date();
+function gerarPagamentosSemanais(dataBase){
+  const hoje=dataBase||new Date();
   const semana=_numeroSemanaISO(hoje);
-  const venc=_vencimentoSexta(hoje);
+  const venc=_vencimentoSabado(hoje);
   let criou=false;
   funcionarios.forEach(f=>{
     if(f.geraSemanal===false) return;
@@ -1477,6 +1477,16 @@ function gerarPagamentosSemanais(){
     }
   });
   return criou;
+}
+function gerarHorizontePagamentosSemanais(semanasAFrente=12){
+  let criouAlgo=false;
+  const hoje=new Date();
+  for(let i=0;i<semanasAFrente;i++){
+    const dataDaSemana=new Date(hoje);
+    dataDaSemana.setDate(hoje.getDate()+(i*7));
+    if(gerarPagamentosSemanais(dataDaSemana)) criouAlgo=true;
+  }
+  return criouAlgo;
 }
 
 /* ===== Contas Recorrentes (Camada 2) ===== */
