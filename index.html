@@ -309,7 +309,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <div id="mvCamposComuns" style="display:none">
         <div class="grid2">
           <div style="grid-column:1/-1"><label>Descrição</label><input id="mvDescricao" placeholder="Ex: Peça X, Aluguel, Cliente Y..."></div>
-          <div><label>Valor</label><input id="mvValor" type="number" step="0.01" oninput="mvRecalcularParcela()"></div>
+          <div><label>Valor</label><input id="mvValor" type="number" step="0.01" oninput="mvRenderLinhasParcelas()"></div>
           <div id="mvWrapData"><label id="mvLabelDataPrincipal">Data</label><input id="mvDataPrincipal" type="date"></div>
           <div><label>Forma de pagamento/recebimento</label><select id="mvForma"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
           <div><label>Banco / conta</label><input id="mvBanco" placeholder="Ex: Caixa, Banco X"></div>
@@ -324,10 +324,15 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
           <div style="display:flex;align-items:center;gap:8px">
             <input type="checkbox" id="mvParcelado" style="width:auto" onchange="mvAtualizarCampos()"> <label style="margin:0">Compra parcelada</label>
           </div>
-          <div class="grid2" id="mvCamposParcela" style="display:none;margin-top:8px">
-            <div><label>Quantidade de parcelas</label><input id="mvQtdParcelas" type="number" min="2" placeholder="Ex: 3" oninput="mvRecalcularParcela()"></div>
-            <div><label>Valor de cada parcela</label><input id="mvValorParcela" type="number" step="0.01"></div>
-            <div><label>Vencimento da 1ª parcela</label><input id="mvPrimeiroVencimento" type="date"></div>
+          <div id="mvCamposParcela" style="display:none;margin-top:8px">
+            <div style="max-width:200px"><label>Quantidade de parcelas</label><input id="mvQtdParcelas" type="number" min="2" placeholder="Ex: 5" oninput="mvRenderLinhasParcelas()"></div>
+            <p class="muted" style="margin:8px 0 0">O valor total é dividido igualmente entre as parcelas, mas cada linha pode ser ajustada — inclusive vencimentos diferentes.</p>
+            <div style="display:grid;grid-template-columns:.6fr 1fr 1fr;gap:8px;margin-top:8px">
+              <small style="font-weight:800;text-transform:uppercase;color:#6b7280">Parcela</small>
+              <small style="font-weight:800;text-transform:uppercase;color:#6b7280">Valor</small>
+              <small style="font-weight:800;text-transform:uppercase;color:#6b7280">Vencimento</small>
+            </div>
+            <div id="mvLinhasParcelas"></div>
           </div>
         </div>
 
@@ -488,12 +493,51 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 
   <div id="finEntradas" class="finance-subsection">
     <div class="panel">
-      <h3>Entradas</h3>
-      <p class="muted">Tudo que entrou na oficina.</p>
-      <table>
-        <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Forma</th><th>Origem</th><th>Ação</th></tr></thead>
+      <div class="cp-topo">
+        <div>
+          <h3>Entradas</h3>
+          <p class="muted">Tudo que entrou na oficina, organizado mês a mês. Use o calendário para uma data ou período específico.</p>
+        </div>
+      </div>
+
+      <div class="cp-toolbar">
+        <div class="cp-calendario-wrap">
+          <button class="gray" onclick="enAbrirCalendario()">Calendário</button>
+          <div class="cp-calendario-popover" id="enCalendarioPopover" style="display:none">
+            <label>Data específica</label>
+            <input id="enDataEspecifica" type="date">
+            <div class="actions" style="margin:8px 0;justify-content:flex-start"><button class="dark" onclick="enAplicarDataEspecifica()">Filtrar essa data</button></div>
+            <hr>
+            <label>Período</label>
+            <div style="display:flex;gap:6px">
+              <input id="enPeriodoInicio" type="date">
+              <input id="enPeriodoFim" type="date">
+            </div>
+            <div class="actions" style="margin-top:8px;justify-content:flex-start"><button class="dark" onclick="enAplicarPeriodo()">Filtrar período</button></div>
+            <div class="actions" style="margin-top:10px;justify-content:space-between">
+              <button class="gray" onclick="enLimparFiltroData()">Limpar</button>
+              <button class="gray" onclick="enFecharCalendario()">Fechar</button>
+            </div>
+          </div>
+        </div>
+        <div class="cp-meses-barra" id="enMesesBarra"></div>
+      </div>
+
+      <div style="margin:6px 0 10px"><input id="enBusca" class="inline-input" style="max-width:340px" placeholder="Buscar por descrição..." oninput="renderEntradas()"></div>
+
+      <table class="finance-table">
+        <thead><tr><th>Data</th><th style="min-width:220px">Descrição</th><th>Banco/Conta</th><th>Forma</th><th>Valor bruto</th><th>Valor líquido</th><th>Situação</th><th>Origem</th><th>Ação</th></tr></thead>
         <tbody id="listaEntradas"></tbody>
       </table>
+
+      <div class="cp-resumo">
+        <h4 id="enResumoTitulo">Resumo do período</h4>
+        <div class="cp-resumo-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div><small>Total bruto</small><div id="enResumoBruto">R$ 0,00</div></div>
+          <div><small>Total líquido</small><div id="enResumoLiquido">R$ 0,00</div></div>
+          <div><small>Quantidade</small><div id="enResumoQtd">0 entradas</div></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2125,7 +2169,8 @@ function abrirCadastrarMovimentacao(){
   document.getElementById('mvTipo').value='';
   mvDescricao.value=''; mvValor.value=''; mvDataPrincipal.value=dataHojeISO(); mvForma.value='Dinheiro';
   mvBanco.value=''; mvCategoria.value=''; mvRecorrente.checked=false; mvAteQuando.value='';
-  mvParcelado.checked=false; mvQtdParcelas.value=''; mvValorParcela.value=''; mvPrimeiroVencimento.value=dataHojeISO();
+  mvParcelado.checked=false; mvQtdParcelas.value='';
+  document.getElementById('mvLinhasParcelas').innerHTML='';
   mvObs.value='';
   document.getElementById('mvCamposComuns').style.display='none';
   ['mvTipoBtnEntrada','mvTipoBtnSaida','mvTipoBtnConta'].forEach(id=>document.getElementById(id).classList.remove('ativo'));
@@ -2149,14 +2194,44 @@ function mvSelecionarTipo(tipo){
 function mvAtualizarCampos(){
   document.getElementById('mvCampoAteQuando').style.display = mvRecorrente.checked ? 'block' : 'none';
   const parcelado = mvTipo.value==='Conta a pagar' && mvParcelado.checked;
-  document.getElementById('mvCamposParcela').style.display = parcelado ? 'grid' : 'none';
+  document.getElementById('mvCamposParcela').style.display = parcelado ? 'block' : 'none';
   document.getElementById('mvWrapData').style.display = parcelado ? 'none' : 'block';
-  mvRecalcularParcela();
+  if(parcelado) mvRenderLinhasParcelas();
 }
-function mvRecalcularParcela(){
-  if(mvTipo.value!=='Conta a pagar' || !mvParcelado.checked) return;
-  const total=Number(mvValor.value||0), qtd=Number(mvQtdParcelas.value||0);
-  if(total>0 && qtd>0) mvValorParcela.value=(total/qtd).toFixed(2);
+function mvRenderLinhasParcelas(){
+  const cont=document.getElementById('mvLinhasParcelas');
+  if(!cont)return;
+  const qtd=Math.max(0, Number(mvQtdParcelas.value||0));
+  const total=Number(mvValor.value||0);
+  const valorPadrao = qtd>0 ? +(total/qtd).toFixed(2) : 0;
+
+  // preserva o que já foi digitado nas linhas existentes ao mudar a quantidade
+  const existentes=[];
+  cont.querySelectorAll('.mv-linha-parcela').forEach(row=>{
+    existentes.push({valor:row.querySelector('.mv-parc-valor').value, data:row.querySelector('.mv-parc-data').value});
+  });
+
+  if(qtd===0){ cont.innerHTML=''; return; }
+
+  const primeiraDataSeed = (existentes[0] && existentes[0].data) || dataHojeISO();
+  const diaBase = Number(primeiraDataSeed.split('-')[2]);
+  let mesRefLoop = primeiraDataSeed.slice(0,7);
+
+  let html='';
+  for(let i=0;i<qtd;i++){
+    let dataDefault;
+    if(i===0){ dataDefault=primeiraDataSeed; }
+    else { mesRefLoop=_proximoMesISO(mesRefLoop); dataDefault=_vencimentoRecorrente(mesRefLoop,diaBase); }
+    const anterior=existentes[i];
+    const valorLinha = anterior ? anterior.valor : valorPadrao;
+    const dataLinha = anterior ? anterior.data : dataDefault;
+    html += `<div class="mv-linha-parcela" style="display:grid;grid-template-columns:.6fr 1fr 1fr;gap:8px;align-items:center;margin-top:6px">
+      <span style="font-weight:800;font-size:13px">${i+1}/${qtd}</span>
+      <input class="inline-input mv-parc-valor" type="number" step="0.01" value="${valorLinha}">
+      <input class="inline-input mv-parc-data" type="date" value="${dataLinha}">
+    </div>`;
+  }
+  cont.innerHTML=html;
 }
 function salvarMovimentacao(){
   const tipo=mvTipo.value;
@@ -2178,20 +2253,23 @@ function salvarMovimentacao(){
 
   } else if(tipo==='Conta a pagar'){
     if(mvParcelado.checked){
-      const qtd=Number(mvQtdParcelas.value||0);
-      const valorParcela=Number(mvValorParcela.value||0);
-      const primeiraData=mvPrimeiroVencimento.value;
-      if(qtd<2){alert('Informe pelo menos 2 parcelas.');return}
-      if(valorParcela<=0){alert('Informe o valor de cada parcela.');return}
-      if(!primeiraData){alert('Informe o vencimento da 1ª parcela.');return}
-      const diaBase=Number(primeiraData.split('-')[2]);
-      let mesRef=primeiraData.slice(0,7);
-      for(let i=1;i<=qtd;i++){
-        const venc = i===1 ? primeiraData : _vencimentoRecorrente(mesRef,diaBase);
-        finance.push({id:Date.now()+Math.floor(Math.random()*100000)+i, descricao:descricao+' ('+i+'/'+qtd+')', categoria:categoria, valor:valorParcela, data:venc, formaPagamento:mvForma.value, banco:banco, tipo:'Mensal', parcelaAtual:i, totalParcelas:qtd, status:'', origem:'Manual', obs:obs});
-        mesRef=_proximoMesISO(mesRef);
+      const linhas=[...document.querySelectorAll('#mvLinhasParcelas .mv-linha-parcela')];
+      if(linhas.length<2){alert('Informe pelo menos 2 parcelas.');return}
+      const dadosParcelas=[];
+      for(const row of linhas){
+        const v=Number(row.querySelector('.mv-parc-valor').value||0);
+        const d=row.querySelector('.mv-parc-data').value;
+        if(v<=0){alert('Informe o valor de todas as parcelas.');return}
+        if(!d){alert('Informe o vencimento de todas as parcelas.');return}
+        dadosParcelas.push({valor:v, data:d});
       }
-      diaRecorrencia=diaBase; dataInicialRecorrencia=primeiraData; mesRefAposCriacao=mesRef;
+      const qtd=dadosParcelas.length;
+      dadosParcelas.forEach((p,idx)=>{
+        finance.push({id:Date.now()+Math.floor(Math.random()*100000)+idx, descricao:descricao+' ('+(idx+1)+'/'+qtd+')', categoria:categoria, valor:p.valor, data:p.data, formaPagamento:mvForma.value, banco:banco, tipo:'Mensal', parcelaAtual:idx+1, totalParcelas:qtd, status:'', origem:'Manual', obs:obs});
+      });
+      diaRecorrencia=Number(dadosParcelas[0].data.split('-')[2]);
+      const ultimaData=dadosParcelas[qtd-1].data;
+      mesRefAposCriacao=_proximoMesISO(ultimaData.slice(0,7));
     } else {
       if(!mvDataPrincipal.value){alert('Informe a data de vencimento.');return}
       finance.push({id:Date.now()+Math.floor(Math.random()*100000), descricao:descricao, categoria:categoria, valor:valor, data:mvDataPrincipal.value, formaPagamento:mvForma.value, banco:banco, tipo:'Mensal', status:valor>0?'':'Aguardando valor', origem:'Manual', obs:obs});
@@ -2199,7 +2277,8 @@ function salvarMovimentacao(){
     }
 
     if(mvRecorrente.checked){
-      recorrentes.push({id:Date.now()+Math.floor(Math.random()*1000), ativa:true, descricao:descricao, categoria:categoria, dia:diaRecorrencia, valor:(mvParcelado.checked?Number(mvValorParcela.value||0):valor)||'', formaPagamento:mvForma.value, dataInicial:mesRefAposCriacao+'-01', dataFinal:mvAteQuando.value||''});
+      const valorRecorrencia = mvParcelado.checked ? Number(document.querySelector('#mvLinhasParcelas .mv-linha-parcela:last-child .mv-parc-valor')?.value||0) : valor;
+      recorrentes.push({id:Date.now()+Math.floor(Math.random()*1000), ativa:true, descricao:descricao, categoria:categoria, dia:diaRecorrencia, valor:valorRecorrencia||'', formaPagamento:mvForma.value, dataInicial:mesRefAposCriacao+'-01', dataFinal:mvAteQuando.value||''});
       gerarHorizonteRecorrentes(12);
       renderRecorrentes();
     }
@@ -2287,22 +2366,64 @@ function desfazerPagamento(i){
   atualizarDashboard();
   salvarAgora();
 }
-function renderEntradas(){
-  const tabela = document.getElementById('listaEntradas');
-  if(!tabela) return;
+function renderBarraMesesEntradas(){
+  const cont=document.getElementById('enMesesBarra');
+  if(!cont)return;
+  const atual=mesAtualISO();
+  if(!window.mesSelecionadoEntradas) window.mesSelecionadoEntradas=atual;
 
-  tabela.innerHTML='';
+  const mesesComEntrada=new Set(entradas.map(e=>String(e.data||'').slice(0,7)).filter(Boolean));
+  mesesComEntrada.add(atual);
 
-  if(!entradas || entradas.length===0){
-    tabela.innerHTML='<tr><td colspan="6" class="muted">Nenhuma entrada registrada.</td></tr>';
-    return;
+  const futurosOuAtual=[...mesesComEntrada].filter(m=>m>=atual).sort();
+  const temAntigas=[...mesesComEntrada].some(m=>m<atual);
+
+  let html='';
+  if(temAntigas){
+    const ativo = !window.enFiltroData && window.mesSelecionadoEntradas==='antigas';
+    html += `<button class="cp-mes-card ${ativo?'ativo':''}" onclick="selecionarMesEntradas('antigas')">Entradas Antigas</button>`;
   }
-
-  entradas.forEach((e,i)=>{
-    tabela.innerHTML += `<tr>
+  futurosOuAtual.forEach(m=>{
+    const ativo = !window.enFiltroData && window.mesSelecionadoEntradas===m;
+    html += `<button class="cp-mes-card ${ativo?'ativo':''}" onclick="selecionarMesEntradas('${m}')">${_mesLabelCurto(m,atual)}</button>`;
+  });
+  cont.innerHTML=html;
+}
+function selecionarMesEntradas(valor){
+  window.mesSelecionadoEntradas=valor;
+  window.enFiltroData=null;
+  enFecharCalendario();
+  renderEntradas();
+}
+function enAbrirCalendario(){ const el=document.getElementById('enCalendarioPopover'); if(el) el.style.display='block'; }
+function enFecharCalendario(){ const el=document.getElementById('enCalendarioPopover'); if(el) el.style.display='none'; }
+function enAplicarDataEspecifica(){
+  const v=document.getElementById('enDataEspecifica').value;
+  if(!v){alert('Escolha uma data.');return}
+  window.enFiltroData={tipo:'data', valor:v};
+  enFecharCalendario();
+  renderEntradas();
+}
+function enAplicarPeriodo(){
+  const ini=document.getElementById('enPeriodoInicio').value, fim=document.getElementById('enPeriodoFim').value;
+  if(!ini||!fim){alert('Escolha a data inicial e a data final.');return}
+  if(ini>fim){alert('A data inicial deve ser anterior à data final.');return}
+  window.enFiltroData={tipo:'periodo', inicio:ini, fim:fim};
+  enFecharCalendario();
+  renderEntradas();
+}
+function enLimparFiltroData(){
+  window.enFiltroData=null;
+  window.mesSelecionadoEntradas=mesAtualISO();
+  enFecharCalendario();
+  renderEntradas();
+}
+function _linhaEntradaHtml(e,i){
+  const situacao=e.situacao||'Recebido';
+  return `<tr>
       <td><input class="inline-input" type="date" value="${e.data||''}" onchange="alterarCampoEntrada(${i},'data',this.value)"></td>
       <td><input class="inline-input desc-input" value="${escapeHtml(e.descricao||'')}" onchange="alterarCampoEntrada(${i},'descricao',this.value)"></td>
-      <td><div class="valor-wrap"><span>R$</span><input class="inline-input" type="number" step="0.01" value="${Number(e.valor||0).toFixed(2)}" onchange="alterarCampoEntrada(${i},'valor',this.value)"></div></td>
+      <td><input class="inline-input" value="${escapeHtml(e.banco||'')}" onchange="alterarCampoEntrada(${i},'banco',this.value)"></td>
       <td>
         <select onchange="alterarCampoEntrada(${i},'forma',this.value)">
           <option ${e.forma==='PIX'?'selected':''}>PIX</option>
@@ -2312,14 +2433,78 @@ function renderEntradas(){
           <option ${e.forma==='CARTÃO MC'?'selected':''}>CARTÃO MC</option>
         </select>
       </td>
-      <td><input class="inline-input" value="${escapeHtml(e.origem||'')}" onchange="alterarCampoEntrada(${i},'origem',this.value)"></td>
+      <td><div class="valor-wrap"><span>R$</span><input class="inline-input" type="number" step="0.01" value="${Number(e.valor||0).toFixed(2)}" onchange="alterarCampoEntrada(${i},'valor',this.value)"></div></td>
+      <td><div class="valor-wrap"><span>R$</span><input class="inline-input" type="number" step="0.01" value="${Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0).toFixed(2)}" onchange="alterarCampoEntrada(${i},'valorLiquido',this.value)"></div></td>
+      <td><select onchange="alterarCampoEntrada(${i},'situacao',this.value)"><option ${situacao==='Recebido'?'selected':''}>Recebido</option><option ${situacao==='A confirmar'?'selected':''}>A confirmar</option></select></td>
+      <td><span class="badge ${e.origem==='Ordem de Serviço'?'blue':'gray'}">${escapeHtml(e.origem||'Manual')}</span></td>
       <td><button class="red" onclick="excluirEntrada(${i})">Excluir</button></td>
     </tr>`;
-  });
+}
+function renderEntradas(){
+  const tabela = document.getElementById('listaEntradas');
+  if(!tabela) return;
+
+  renderBarraMesesEntradas();
+
+  const busca=(document.getElementById('enBusca')?.value||'').trim().toLowerCase();
+  const filtroData=window.enFiltroData;
+  let periodoEntradas, tituloPeriodo, modoAntigas=false;
+
+  if(filtroData){
+    periodoEntradas = entradas.filter(e=>{
+      const d=String(e.data||'').slice(0,10);
+      if(filtroData.tipo==='data') return d===filtroData.valor;
+      if(filtroData.tipo==='periodo') return d && d>=filtroData.inicio && d<=filtroData.fim;
+      return true;
+    });
+    tituloPeriodo = filtroData.tipo==='data' ? ('Entradas de '+dataBR(filtroData.valor)) : ('Entradas de '+dataBR(filtroData.inicio)+' até '+dataBR(filtroData.fim));
+  } else if(window.mesSelecionadoEntradas==='antigas'){
+    modoAntigas=true;
+    const atual=mesAtualISO();
+    periodoEntradas = entradas.filter(e=>{ const m=String(e.data||'').slice(0,7); return m && m<atual; });
+    tituloPeriodo = 'Entradas antigas';
+  } else {
+    const mesRef = window.mesSelecionadoEntradas || mesAtualISO();
+    periodoEntradas = entradas.filter(e=>String(e.data||'').slice(0,7)===mesRef);
+    const lbl=_mesLabelPt(mesRef);
+    tituloPeriodo = lbl.charAt(0).toUpperCase()+lbl.slice(1);
+  }
+
+  const totalBruto = periodoEntradas.reduce((s,e)=>s+Number(e.valor||0),0);
+  const totalLiquido = periodoEntradas.reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
+  const qtd = periodoEntradas.length;
+
+  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
+  setTxt('enResumoTitulo', tituloPeriodo);
+  setTxt('enResumoBruto', moeda(totalBruto));
+  setTxt('enResumoLiquido', moeda(totalLiquido));
+  setTxt('enResumoQtd', qtd+(qtd===1?' entrada':' entradas'));
+
+  let visiveis = periodoEntradas.filter(e=>!busca || String(e.descricao||'').toLowerCase().includes(busca));
+  visiveis.sort((a,b)=>String(a.data||'9999-12-31').localeCompare(String(b.data||'9999-12-31')));
+
+  tabela.innerHTML='';
+  if(visiveis.length===0){
+    tabela.innerHTML='<tr><td colspan="9" class="muted">Nenhuma entrada encontrada.</td></tr>';
+  } else if(modoAntigas){
+    let grupoAtual=null;
+    visiveis.forEach(e=>{
+      const idx=entradas.indexOf(e);
+      const mesE=String(e.data||'').slice(0,7);
+      if(mesE!==grupoAtual){
+        grupoAtual=mesE;
+        const lbl=_mesLabelPt(mesE);
+        tabela.innerHTML += `<tr><td colspan="9" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
+      }
+      tabela.innerHTML += _linhaEntradaHtml(e,idx);
+    });
+  } else {
+    visiveis.forEach(e=>{ tabela.innerHTML += _linhaEntradaHtml(e, entradas.indexOf(e)); });
+  }
 }
 
 function alterarCampoEntrada(i,campo,valor){
-  if(campo==='valor') entradas[i][campo]=Number(valor||0);
+  if(campo==='valor'||campo==='valorLiquido') entradas[i][campo]=Number(valor||0);
   else entradas[i][campo]=valor;
   renderEntradas();
   atualizarDashboard();
