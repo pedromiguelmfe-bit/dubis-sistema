@@ -290,42 +290,54 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     </div>
 
     <div class="panel">
-      <h3>Adicionar pagamento / conta</h3>
-      <div class="grid2">
-        <div><label>Tipo</label><select id="fTipo"><option>Mensal</option><option>Variável</option><option>Semanal</option></select></div>
-        <div><label>Data para pagar</label><input id="fData" type="date" onchange="renderCamposParcelas(); preencherDatasParcelasAutomaticas();"></div>
-        <div><label>Descrição</label><input id="fDescricao" placeholder="Ex: aluguel, água, fornecedor..."></div>
-        <div><label>Valor</label><input id="fValor" type="number" step="0.01"></div>
-        <div><label>Status</label><select id="fStatus"><option>A vencer</option><option>Pago</option><option>Vencido</option></select></div>
-        <div><label>Parcela</label><input id="fParcelaAtual" placeholder="Ex: 3/12"></div>
-        <div><label>Gerar parcelas automáticas?</label><select id="fGerarParcelas" onchange="renderCamposParcelas()"><option>Não</option><option>Sim</option></select></div>
-        <div><label>Quantidade de parcelas</label><input id="fQtdParcelas" type="number" placeholder="Ex: 3" oninput="renderCamposParcelas()"></div>
-        <div style="grid-column:1/-1"><div id="camposParcelas" class="vehicle-list" style="display:none"></div></div>
-      </div>
-      <div class="actions"><button class="dark" onclick="salvarContaPagar()">Adicionar pagamento</button></div>
+      <h3>Cadastrar movimentação</h3>
+      <p class="muted">Lance uma entrada, saída ou conta a pagar em um só lugar. Compras parceladas geram todas as parcelas automaticamente em Contas a Pagar.</p>
+      <button class="btn-nova" onclick="abrirCadastrarMovimentacao()">+ Cadastrar movimentação</button>
     </div>
+  </div>
 
-    <div class="grid2">
-      <div class="panel">
-        <h3>Adicionar entrada</h3>
-        <div class="grid2">
-          <div><label>Data que entrou</label><input id="eData" type="date"></div>
-          <div><label>Descrição</label><input id="eDescricao" placeholder="Ex: OS Gol, cliente João..."></div>
-          <div><label>Valor recebido</label><input id="eValor" type="number" step="0.01"></div>
-          <div><label>Forma</label><select id="eForma"><option>PIX</option><option>DINHEIRO</option><option>CARTÃO</option><option>TRANSFERÊNCIA</option></select></div>
-        </div>
-        <div class="actions"><button class="dark" onclick="salvarEntrada()">Adicionar entrada</button></div>
+  <div class="cp-modal-overlay" id="modalMovimentacaoOverlay">
+    <div class="cp-modal wide">
+      <h3>Cadastrar movimentação</h3>
+      <div class="cp-filtros" style="margin:0 0 14px 0">
+        <button class="cp-filtro" id="mvTipoBtnEntrada" onclick="mvSelecionarTipo('Entrada')">Entrada</button>
+        <button class="cp-filtro" id="mvTipoBtnSaida" onclick="mvSelecionarTipo('Saída')">Saída</button>
+        <button class="cp-filtro" id="mvTipoBtnConta" onclick="mvSelecionarTipo('Conta a pagar')">Conta a pagar</button>
       </div>
+      <input type="hidden" id="mvTipo" value="">
 
-      <div class="panel">
-        <h3>Adicionar saída</h3>
+      <div id="mvCamposComuns" style="display:none">
         <div class="grid2">
-          <div><label>Data da saída</label><input id="sData" type="date"></div>
-          <div><label>Descrição</label><input id="sDescricao" placeholder="Ex: pão, café, compra pequena..."></div>
-          <div><label>Valor</label><input id="sValor" type="number" step="0.01"></div>
-          <div><label>Categoria</label><select id="sCategoria"><option>Pequena despesa</option><option>Fornecedor</option><option>Funcionário</option><option>Outros</option></select></div>
+          <div style="grid-column:1/-1"><label>Descrição</label><input id="mvDescricao" placeholder="Ex: Peça X, Aluguel, Cliente Y..."></div>
+          <div><label>Valor</label><input id="mvValor" type="number" step="0.01" oninput="mvRecalcularParcela()"></div>
+          <div id="mvWrapData"><label id="mvLabelDataPrincipal">Data</label><input id="mvDataPrincipal" type="date"></div>
+          <div><label>Forma de pagamento/recebimento</label><select id="mvForma"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
+          <div><label>Banco / conta</label><input id="mvBanco" placeholder="Ex: Caixa, Banco X"></div>
+          <div><label>Categoria</label><input id="mvCategoria" placeholder="Ex: Peças, Fornecedor, Estrutura"></div>
+          <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="mvRecorrente" style="width:auto" onchange="mvAtualizarCampos()"> <label style="margin:0">Esta movimentação é recorrente</label>
+          </div>
+          <div id="mvCampoAteQuando" style="display:none;grid-column:1/-1"><label>Recorrente até quando (opcional — deixe em branco para continuar indefinidamente)</label><input id="mvAteQuando" type="date"></div>
         </div>
-        <div class="actions"><button class="dark" onclick="salvarSaida()">Adicionar saída</button></div>
+
+        <div id="mvBlocoParcelamento" style="display:none;margin-top:10px;border-top:1px solid #e5e7eb;padding-top:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="mvParcelado" style="width:auto" onchange="mvAtualizarCampos()"> <label style="margin:0">Compra parcelada</label>
+          </div>
+          <div class="grid2" id="mvCamposParcela" style="display:none;margin-top:8px">
+            <div><label>Quantidade de parcelas</label><input id="mvQtdParcelas" type="number" min="2" placeholder="Ex: 3" oninput="mvRecalcularParcela()"></div>
+            <div><label>Valor de cada parcela</label><input id="mvValorParcela" type="number" step="0.01"></div>
+            <div><label>Vencimento da 1ª parcela</label><input id="mvPrimeiroVencimento" type="date"></div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:10px">
+          <div style="grid-column:1/-1"><label>Observações</label><input id="mvObs" placeholder="Opcional"></div>
+        </div>
+        <div class="actions">
+          <button class="gray" onclick="fecharModalMovimentacao()">Cancelar</button>
+          <button class="dark" onclick="salvarMovimentacao()">Salvar movimentação</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2108,6 +2120,99 @@ function renderFinanceiro(){
   atualizarResumoFinanceiro('todos');
   salvarDados();
 }
+/* ===== Cadastrar Movimentação unificada (Fase A) ===== */
+function abrirCadastrarMovimentacao(){
+  document.getElementById('mvTipo').value='';
+  mvDescricao.value=''; mvValor.value=''; mvDataPrincipal.value=dataHojeISO(); mvForma.value='Dinheiro';
+  mvBanco.value=''; mvCategoria.value=''; mvRecorrente.checked=false; mvAteQuando.value='';
+  mvParcelado.checked=false; mvQtdParcelas.value=''; mvValorParcela.value=''; mvPrimeiroVencimento.value=dataHojeISO();
+  mvObs.value='';
+  document.getElementById('mvCamposComuns').style.display='none';
+  ['mvTipoBtnEntrada','mvTipoBtnSaida','mvTipoBtnConta'].forEach(id=>document.getElementById(id).classList.remove('ativo'));
+  document.getElementById('mvBlocoParcelamento').style.display='none';
+  document.getElementById('mvCamposParcela').style.display='none';
+  document.getElementById('mvCampoAteQuando').style.display='none';
+  modalMovimentacaoOverlay.classList.add('aberto');
+}
+function fecharModalMovimentacao(){ modalMovimentacaoOverlay.classList.remove('aberto'); }
+function mvSelecionarTipo(tipo){
+  mvTipo.value=tipo;
+  document.getElementById('mvCamposComuns').style.display='block';
+  const map={'Entrada':'mvTipoBtnEntrada','Saída':'mvTipoBtnSaida','Conta a pagar':'mvTipoBtnConta'};
+  ['mvTipoBtnEntrada','mvTipoBtnSaida','mvTipoBtnConta'].forEach(id=>document.getElementById(id).classList.remove('ativo'));
+  document.getElementById(map[tipo]).classList.add('ativo');
+  document.getElementById('mvLabelDataPrincipal').innerText = tipo==='Entrada' ? 'Data do recebimento' : tipo==='Saída' ? 'Data da saída' : 'Data de vencimento';
+  document.getElementById('mvBlocoParcelamento').style.display = tipo==='Conta a pagar' ? 'block' : 'none';
+  if(tipo!=='Conta a pagar') mvParcelado.checked=false;
+  mvAtualizarCampos();
+}
+function mvAtualizarCampos(){
+  document.getElementById('mvCampoAteQuando').style.display = mvRecorrente.checked ? 'block' : 'none';
+  const parcelado = mvTipo.value==='Conta a pagar' && mvParcelado.checked;
+  document.getElementById('mvCamposParcela').style.display = parcelado ? 'grid' : 'none';
+  document.getElementById('mvWrapData').style.display = parcelado ? 'none' : 'block';
+  mvRecalcularParcela();
+}
+function mvRecalcularParcela(){
+  if(mvTipo.value!=='Conta a pagar' || !mvParcelado.checked) return;
+  const total=Number(mvValor.value||0), qtd=Number(mvQtdParcelas.value||0);
+  if(total>0 && qtd>0) mvValorParcela.value=(total/qtd).toFixed(2);
+}
+function salvarMovimentacao(){
+  const tipo=mvTipo.value;
+  if(!tipo){alert('Selecione o tipo: Entrada, Saída ou Conta a pagar.');return}
+  if(!mvDescricao.value.trim()){alert('Informe a descrição.');return}
+  const valor=Number(mvValor.value||0);
+  const descricao=mvDescricao.value.trim(), categoria=mvCategoria.value.trim(), banco=mvBanco.value.trim(), obs=mvObs.value.trim();
+  let mesRefAposCriacao='', diaRecorrencia=1, dataInicialRecorrencia='';
+
+  if(tipo==='Entrada'){
+    if(valor<=0){alert('Informe o valor recebido.');return}
+    if(!mvDataPrincipal.value){alert('Informe a data do recebimento.');return}
+    entradas.push({id:Date.now()+Math.floor(Math.random()*100000), data:mvDataPrincipal.value, descricao:descricao, valor:valor, forma:(mvForma.value||'').toUpperCase(), banco:banco, origem:'Manual', obs:obs});
+
+  } else if(tipo==='Saída'){
+    if(valor<=0){alert('Informe o valor da saída.');return}
+    if(!mvDataPrincipal.value){alert('Informe a data da saída.');return}
+    saidas.push({id:Date.now()+Math.floor(Math.random()*100000), data:mvDataPrincipal.value, descricao:descricao, categoria:categoria||'Outros', valor:valor, formaPagamento:mvForma.value, contaCaixa:banco, origem:'Manual', obs:obs});
+
+  } else if(tipo==='Conta a pagar'){
+    if(mvParcelado.checked){
+      const qtd=Number(mvQtdParcelas.value||0);
+      const valorParcela=Number(mvValorParcela.value||0);
+      const primeiraData=mvPrimeiroVencimento.value;
+      if(qtd<2){alert('Informe pelo menos 2 parcelas.');return}
+      if(valorParcela<=0){alert('Informe o valor de cada parcela.');return}
+      if(!primeiraData){alert('Informe o vencimento da 1ª parcela.');return}
+      const diaBase=Number(primeiraData.split('-')[2]);
+      let mesRef=primeiraData.slice(0,7);
+      for(let i=1;i<=qtd;i++){
+        const venc = i===1 ? primeiraData : _vencimentoRecorrente(mesRef,diaBase);
+        finance.push({id:Date.now()+Math.floor(Math.random()*100000)+i, descricao:descricao+' ('+i+'/'+qtd+')', categoria:categoria, valor:valorParcela, data:venc, formaPagamento:mvForma.value, banco:banco, tipo:'Mensal', parcelaAtual:i, totalParcelas:qtd, status:'', origem:'Manual', obs:obs});
+        mesRef=_proximoMesISO(mesRef);
+      }
+      diaRecorrencia=diaBase; dataInicialRecorrencia=primeiraData; mesRefAposCriacao=mesRef;
+    } else {
+      if(!mvDataPrincipal.value){alert('Informe a data de vencimento.');return}
+      finance.push({id:Date.now()+Math.floor(Math.random()*100000), descricao:descricao, categoria:categoria, valor:valor, data:mvDataPrincipal.value, formaPagamento:mvForma.value, banco:banco, tipo:'Mensal', status:valor>0?'':'Aguardando valor', origem:'Manual', obs:obs});
+      diaRecorrencia=Number(mvDataPrincipal.value.split('-')[2]); dataInicialRecorrencia=mvDataPrincipal.value; mesRefAposCriacao=_proximoMesISO(mvDataPrincipal.value.slice(0,7));
+    }
+
+    if(mvRecorrente.checked){
+      recorrentes.push({id:Date.now()+Math.floor(Math.random()*1000), ativa:true, descricao:descricao, categoria:categoria, dia:diaRecorrencia, valor:(mvParcelado.checked?Number(mvValorParcela.value||0):valor)||'', formaPagamento:mvForma.value, dataInicial:mesRefAposCriacao+'-01', dataFinal:mvAteQuando.value||''});
+      gerarHorizonteRecorrentes(12);
+      renderRecorrentes();
+    }
+  }
+
+  fecharModalMovimentacao();
+  renderFinanceiro();
+  renderEntradas();
+  renderSaidas();
+  atualizarDashboard();
+  salvarAgora();
+}
+
 function abrirNovaConta(){
   document.getElementById('mcTitulo').innerText='Nova conta';
   mcIndex.value=''; mcDescricao.value=''; mcCategoria.value=''; mcFornecedor.value=''; mcCentroCusto.value='';
