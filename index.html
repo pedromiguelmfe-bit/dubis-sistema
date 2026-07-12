@@ -596,7 +596,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       </div>
 
       <table class="finance-table">
-        <thead><tr><th>Data</th><th style="min-width:220px">Descrição</th><th>Categoria</th><th>Tipo</th><th>Banco</th><th>Forma</th><th>Valor bruto</th><th>Valor líquido</th><th>Situação</th></tr></thead>
+        <thead><tr><th>Data</th><th style="min-width:220px">Descrição</th><th>Categoria</th><th>Tipo</th><th>Banco</th><th>Forma</th><th>Valor bruto</th><th>Valor líquido</th><th>Situação</th><th>Ação</th></tr></thead>
         <tbody id="listaMovimentacoes"></tbody>
       </table>
 
@@ -613,6 +613,16 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
           <div><small>Lucro líquido</small><div id="mrLucroLiquido">R$ 0,00</div></div>
           <div><small>Saldo final</small><div id="mrSaldoFinal">R$ 0,00</div></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalDetalheOSOverlay">
+    <div class="cp-modal wide">
+      <h3>Detalhamento do serviço</h3>
+      <div id="odDetalheConteudo"></div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalDetalheOS()">Fechar</button>
       </div>
     </div>
   </div>
@@ -2617,7 +2627,7 @@ function _movimentacoesUnificadas(){
     categoria: e.origem==='Ordem de Serviço' ? 'Serviço concluído' : 'Entrada',
     banco:e.banco||'', forma:e.forma||'',
     valorBruto:Number(e.valor||0), valorLiquido:Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),
-    situacao:e.situacao||'Recebido', origemDetalhe:e.origem||'Manual'
+    situacao:e.situacao||'Recebido', origemDetalhe:e.origem||'Manual', osRef:e.osRef||null
   }));
   saidas.forEach(s=>itens.push({
     tipo:'Saída', data:s.data, descricao:s.descricao||'',
@@ -2683,6 +2693,7 @@ function mrLimparFiltroData(){
 }
 function _linhaMovimentacaoHtml(m){
   const corTipo = m.tipo==='Entrada' ? 'green' : 'red';
+  const acao = (m.tipo==='Entrada' && m.osRef) ? `<button onclick="abrirDetalheOS('${m.osRef}')">Ver OS</button>` : '';
   return `<tr>
     <td>${dataBR(m.data)}</td>
     <td>${escapeHtml(m.descricao)}</td>
@@ -2693,6 +2704,7 @@ function _linhaMovimentacaoHtml(m){
     <td>${moeda(m.valorBruto)}</td>
     <td>${moeda(m.valorLiquido)}</td>
     <td>${escapeHtml(m.situacao)}</td>
+    <td>${acao}</td>
   </tr>`;
 }
 function renderMovimentacoes(){
@@ -2766,7 +2778,7 @@ function renderMovimentacoes(){
 
   tabela.innerHTML='';
   if(visiveis.length===0){
-    tabela.innerHTML='<tr><td colspan="9" class="muted">Nenhuma movimentação encontrada.</td></tr>';
+    tabela.innerHTML='<tr><td colspan="10" class="muted">Nenhuma movimentação encontrada.</td></tr>';
   } else if(modoAntigas){
     let grupoAtual=null;
     visiveis.forEach(m=>{
@@ -2774,7 +2786,7 @@ function renderMovimentacoes(){
       if(mesM!==grupoAtual){
         grupoAtual=mesM;
         const lbl=_mesLabelPt(mesM);
-        tabela.innerHTML += `<tr><td colspan="9" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
+        tabela.innerHTML += `<tr><td colspan="10" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
       }
       tabela.innerHTML += _linhaMovimentacaoHtml(m);
     });
@@ -2782,6 +2794,64 @@ function renderMovimentacoes(){
     visiveis.forEach(m=>{ tabela.innerHTML += _linhaMovimentacaoHtml(m); });
   }
 }
+
+/* ===== Detalhamento por Ordem de Serviço (Fase D) ===== */
+function abrirDetalheOS(quoteId){
+  const os = servicosConcluidos.find(s=>String(s.quoteId)===String(quoteId));
+  if(!os){ alert('Não foi possível localizar os dados completos deste serviço.'); return; }
+  const entrada = entradas.find(e=>String(e.osRef)===String(quoteId));
+
+  const valorCobrado = Number(os.total||0);
+  const items = os.items||[];
+
+  let totalCustoPecas=0, totalVendaPecas=0, totalVendaSemCusto=0;
+  const linhasItens = items.map(it=>{
+    const qtd=Number(it.qtd||0), bruto=Number(it.valorBruto||0), venda=Number(it.valor||0);
+    const custoTotal=qtd*bruto, vendaTotal=qtd*venda;
+    if(bruto>0){ totalCustoPecas+=custoTotal; totalVendaPecas+=vendaTotal; }
+    else { totalVendaSemCusto+=vendaTotal; }
+    return `<tr>
+      <td>${escapeHtml(it.desc||'')}</td>
+      <td>${qtd}</td>
+      <td>${bruto>0?moeda(bruto):'-'}</td>
+      <td>${moeda(venda)}</td>
+      <td>${moeda(vendaTotal)}</td>
+    </tr>`;
+  }).join('');
+
+  const valorLiquidoReal = entrada ? Number(entrada.valorLiquido!=null?entrada.valorLiquido:entrada.valor||0) : valorCobrado;
+  const taxaMaquininha = entrada ? (Number(entrada.valor||0) - valorLiquidoReal) : 0;
+  const lucroLiquido = valorLiquidoReal - totalCustoPecas;
+
+  document.getElementById('odDetalheConteudo').innerHTML = `
+    <div class="grid2" style="margin-bottom:10px">
+      <div><small class="muted">Nº da OS</small><div style="font-weight:800">${escapeHtml(String(os.quoteId||''))}</div></div>
+      <div><small class="muted">Data</small><div style="font-weight:800">${dataBR(os.data)}</div></div>
+      <div><small class="muted">Cliente</small><div style="font-weight:800">${escapeHtml(os.cliente||'-')}</div></div>
+      <div><small class="muted">Veículo / placa</small><div style="font-weight:800">${escapeHtml(os.veiculo||'-')} — ${escapeHtml(os.placa||'-')}</div></div>
+      <div><small class="muted">Forma de pagamento</small><div style="font-weight:800">${escapeHtml(os.forma||'-')}</div></div>
+      <div><small class="muted">Mecânico</small><div style="font-weight:800">${escapeHtml(os.funcionario||'-')}</div></div>
+    </div>
+    <table class="rec-table">
+      <thead><tr><th>Item</th><th>Qtd</th><th>Custo unit.</th><th>Venda unit.</th><th>Total venda</th></tr></thead>
+      <tbody>${linhasItens || '<tr><td colspan="5" class="muted">Sem itens detalhados.</td></tr>'}</tbody>
+    </table>
+    <p class="muted" style="margin-top:4px">Itens sem custo informado (marcados com "-") entram como mão de obra / outros na soma abaixo, já que o sistema não diferencia esse tipo de item automaticamente.</p>
+    <div class="cp-resumo" style="margin-top:12px">
+      <div class="cp-resumo-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div><small>Valor cobrado do cliente</small><div>${moeda(valorCobrado)}</div></div>
+        <div><small>Gasto com peças</small><div>${moeda(totalCustoPecas)}</div></div>
+        <div><small>Mão de obra / outros itens</small><div>${moeda(totalVendaSemCusto)}</div></div>
+        <div><small>Taxa/desconto da maquininha</small><div>${moeda(taxaMaquininha)}</div></div>
+        <div><small>Valor realmente creditado</small><div>${moeda(valorLiquidoReal)}</div></div>
+        <div><small>Lucro líquido do serviço</small><div>${moeda(lucroLiquido)}</div></div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:10px">O valor creditado vem do campo "Valor líquido" da entrada (aba Entradas ou Movimentações). Se o pagamento foi no cartão e teve desconto da maquininha, edite esse campo lá para a taxa aparecer aqui automaticamente.</p>
+  `;
+  modalDetalheOSOverlay.classList.add('aberto');
+}
+function fecharModalDetalheOS(){ modalDetalheOSOverlay.classList.remove('aberto'); }
 
 function atualizarResumoFinanceiro(filtro='todos'){
   const contasFiltradas = finance.filter(c=>contaPassaFiltro(c,filtro));
