@@ -910,7 +910,9 @@ function diasEntre(dataISO){
 }
 
 function limparOrcamentosAntigos(){
-  quotes = quotes.filter(q => diasEntre(q.createdAt) <= 60);
+  // Nunca apaga orçamentos que já viraram OS ou foram concluídos — só descarta rascunhos
+  // ("Aberto") abandonados há mais de 60 dias, que nunca foram aprovados nem finalizados.
+  quotes = quotes.filter(q => q.status!=='Aberto' || diasEntre(q.createdAt) <= 60);
   salvarDados();
 }
 
@@ -1548,7 +1550,7 @@ function renderOS(){
 
 function vincularFuncionarioOS(i, funcionarioId){
   serviceOrders[i].funcionarioId = funcionarioId;
-  salvarDados();
+  salvarAgora();
   renderOS();
 }
 
@@ -1619,7 +1621,7 @@ function voltarOrdemParaOrcamento(i){
   const q = quotes.find(x=>x.id===os.quoteId);
   if(q) q.status='Aberto';
   serviceOrders.splice(i,1);
-  renderQuotes(); renderOS(); atualizarDashboard(); salvarDados();
+  renderQuotes(); renderOS(); atualizarDashboard(); salvarAgora();
 }
 
 function pesquisarConcluidos(){
