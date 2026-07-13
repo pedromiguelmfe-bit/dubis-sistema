@@ -242,6 +242,11 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <button class="dark" onclick="finalizarOrcamento()" id="btnFinalizarOrcamento">Finalizar orçamento</button>
       <button class="gray" onclick="cancelarOrcamento()">Cancelar</button>
     </div>
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:10px">
+      <label style="font-size:13px;font-weight:700;color:#374151">Desconto (R$)</label>
+      <input id="qDesconto" type="number" step="0.01" placeholder="0,00" style="max-width:140px" oninput="atualizarTotalAtual()">
+    </div>
+    <div id="resumoDescontoOrc" class="muted" style="text-align:right;margin-top:6px;font-size:13px"></div>
     <div class="total-box"><span>Total do orçamento (venda)</span><span id="totalAtual">R$ 0,00</span></div>
     <div id="resumoInternoOrc" class="muted" style="margin-top:8px;font-size:13px"></div>
   </div>
@@ -266,13 +271,30 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 <section id="os" class="section">
   <div class="panel">
     <h3>Ordens de serviço aprovadas</h3>
-    <p class="muted">Vincule funcionário responsável e lance recebimentos rápidos em Pix, dinheiro ou cartão.</p>
+    <p class="muted">Vincule o funcionário responsável e lance pagamentos — inclusive parciais. A OS fica "Parcialmente pago" até quitar tudo, depois vai sozinha pra Serviços Concluídos.</p>
     <table>
-      <thead><tr><th>Cliente</th><th>Veículo</th><th>Placa</th><th>Valor</th><th>Status</th><th>Funcionário</th><th>Receber</th><th>Ações</th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Veículo</th><th>Placa</th><th>Valor</th><th>Status</th><th>Funcionário</th><th>Pagamento</th><th>Ações</th></tr></thead>
       <tbody id="listaOS"></tbody>
     </table>
   </div>
 </section>
+
+<div class="cp-modal-overlay" id="modalPagamentoOSOverlay">
+  <div class="cp-modal">
+    <h3>Lançar pagamento</h3>
+    <div id="opResumo" class="muted" style="margin-bottom:12px"></div>
+    <div class="grid2">
+      <div><label>Valor recebido</label><input id="opValor" type="number" step="0.01"></div>
+      <div><label>Data do pagamento</label><input id="opData" type="date"></div>
+      <div><label>Forma de pagamento</label><select id="opForma"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
+      <div style="grid-column:1/-1"><label>Observação (opcional)</label><input id="opObs" placeholder="Opcional"></div>
+    </div>
+    <div class="actions">
+      <button class="gray" onclick="fecharModalPagamentoOS()">Cancelar</button>
+      <button class="dark" onclick="confirmarPagamentoOS()">Confirmar pagamento</button>
+    </div>
+  </div>
+</div>
 
 
 
@@ -1087,7 +1109,7 @@ function atualizarDashboard(){
   const entradasHoje = entradas.filter(e=>String(e.data||'').slice(0,10)===hoje);
   const rendaDia   = entradasHoje.reduce((s,e)=>s+Number(e.valor||0),0);
   const entradasMes= entradas.filter(e=>String(e.data||'').slice(0,7)===mes).reduce((s,e)=>s+Number(e.valor||0),0);
-  const aReceber   = serviceOrders.reduce((s,o)=>s+Number(o.total||0),0);
+  const aReceber   = serviceOrders.reduce((s,o)=>s+Math.max(0, Number(o.total||0)-_totalPagoOS(o)),0);
   const lucroMes   = entradasMes - pagasMes;
 
   const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.innerText=val; };
@@ -1182,7 +1204,7 @@ function novoOrcamento(){
   btnFinalizarOrcamento.innerText='Finalizar orçamento';
   orcamentoEditandoAviso.innerHTML='';
   formOrcamento.style.display='block';
-  qCliente.value=''; qPlaca.value=''; qVeiculo.value=''; qKm.value=''; qObs.value=''; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
+  qCliente.value=''; qPlaca.value=''; qVeiculo.value=''; qKm.value=''; qObs.value=''; qDesconto.value=''; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
   currentItems=[]; addLinhaItem();
 }
 
@@ -1212,13 +1234,21 @@ function recalcVendaItem(i){
 function removerItem(i){currentItems.splice(i,1);renderItens();atualizarTotalAtual()}
 function totalItens(items){return items.reduce((s,it)=>s+(Number(it.qtd||0)*Number(it.valor||0)),0)}
 function atualizarTotalAtual(){
-  const venda=totalItens(currentItems);
-  totalAtual.innerText=moeda(venda);
+  const subtotal=totalItens(currentItems);
+  const desconto=Number(document.getElementById('qDesconto')?.value||0);
+  const total=Math.max(0, subtotal-desconto);
+  totalAtual.innerText=moeda(total);
+  const elDesc=document.getElementById('resumoDescontoOrc');
+  if(elDesc){
+    elDesc.innerHTML = desconto>0
+      ? `Subtotal: ${moeda(subtotal)} &nbsp;·&nbsp; Desconto: -${moeda(desconto)}`
+      : '';
+  }
   const custo=currentItems.reduce((s,it)=>s+Number(it.qtd||0)*Number(it.valorBruto||0),0);
   const el=document.getElementById('resumoInternoOrc');
   if(el){
     el.innerHTML = custo>0
-      ? `<strong>Uso interno (não aparece no orçamento do cliente):</strong> Custo das peças informadas: ${moeda(custo)} · Lucro estimado: ${moeda(venda-custo)}`
+      ? `<strong>Uso interno (não aparece no orçamento do cliente):</strong> Custo das peças informadas: ${moeda(custo)} · Lucro estimado: ${moeda(total-custo)}`
       : '';
   }
 }
@@ -1519,7 +1549,10 @@ function renderClientes(){
 function finalizarOrcamento(){
   if(!qCliente.value){alert('Informe o nome do cliente.');return}
   if(currentItems.length===0){alert('Adicione pelo menos um item.');return}
-  const data={cliente:qCliente.value, placa:qPlaca.value, veiculo:qVeiculo.value, km:qKm.value.trim(), obs:qObs.value.trim(), items:JSON.parse(JSON.stringify(currentItems)), total:totalItens(currentItems)};
+  const subtotal=totalItens(currentItems);
+  const desconto=Number(qDesconto.value||0);
+  const total=Math.max(0, subtotal-desconto);
+  const data={cliente:qCliente.value, placa:qPlaca.value, veiculo:qVeiculo.value, km:qKm.value.trim(), obs:qObs.value.trim(), items:JSON.parse(JSON.stringify(currentItems)), subtotal:subtotal, desconto:desconto, total:total};
   data.clientId = salvarClienteBasicoDoOrcamento(data);
   if(editingQuoteId){
     const q=quotes.find(x=>x.id===editingQuoteId);
@@ -1530,7 +1563,7 @@ function finalizarOrcamento(){
   if(editingQuoteId){
     const os = serviceOrders.find(o=>o.quoteId===editingQuoteId);
     if(os){
-      os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.km=data.km; os.obs=data.obs; os.clientId=data.clientId; os.items=JSON.parse(JSON.stringify(data.items)); os.total=data.total;
+      os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.km=data.km; os.obs=data.obs; os.clientId=data.clientId; os.items=JSON.parse(JSON.stringify(data.items)); os.subtotal=data.subtotal; os.desconto=data.desconto; os.total=data.total;
     }
   }
   formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard(); salvarAgora();
@@ -1543,7 +1576,7 @@ function editarOrcamento(id){
   btnFinalizarOrcamento.innerText='Salvar alterações do orçamento';
   orcamentoEditandoAviso.innerHTML='<div class="editing">Você está editando esse orçamento. Altere os campos e salve.</div>';
   formOrcamento.style.display='block';
-  qCliente.value=q.cliente; qPlaca.value=q.placa; qVeiculo.value=q.veiculo; qKm.value=q.km||''; qObs.value=q.obs||''; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
+  qCliente.value=q.cliente; qPlaca.value=q.placa; qVeiculo.value=q.veiculo; qKm.value=q.km||''; qObs.value=q.obs||''; qDesconto.value=q.desconto||''; if(document.getElementById('sugestoesOrcamento')) sugestoesOrcamento.innerHTML='';
   currentItems=JSON.parse(JSON.stringify(q.items||[]));
   renderItens(); atualizarTotalAtual();
   window.scrollTo({top:0,behavior:'smooth'});
@@ -1579,14 +1612,20 @@ function aprovarOrcamento(id){
       km:q.km||'',
       obs:q.obs||'',
       clientId:q.clientId||null,
+      subtotal:q.subtotal!=null?q.subtotal:q.total,
+      desconto:q.desconto||0,
       total:q.total,
       status:'Aprovado',
       items:JSON.parse(JSON.stringify(q.items||[])),
       funcionarioId:'',
+      pagamentos:[],
       createdAt:q.createdAt
     });
   }
   renderQuotes(); renderOS(); atualizarDashboard(); salvarAgora();
+}
+function _totalPagoOS(os){
+  return (os.pagamentos||[]).reduce((s,p)=>s+Number(p.valor||0),0);
 }
 function renderOS(){
   listaOS.innerHTML='';
@@ -1596,19 +1635,21 @@ function renderOS(){
   }
   serviceOrders.forEach((o,i)=>{
     const optionsFuncionarios = '<option value="">Selecionar</option>' + funcionarios.map(f=>`<option value="${f.id}" ${String(o.funcionarioId||'')===String(f.id)?'selected':''}>${escapeHtml(f.nome)}</option>`).join('');
+    const totalPago=_totalPagoOS(o);
+    const saldo=Math.max(0, Number(o.total||0)-totalPago);
+    const statusBadge = totalPago<=0 ? '<span class="badge green">Aprovado</span>' : '<span class="badge orange">Parcialmente pago</span>';
+    const listaPagamentos = (o.pagamentos||[]).length ? `<div style="margin-top:6px;font-size:11px" class="muted">` + o.pagamentos.map(p=>`${dataBR(p.data)} — ${moeda(p.valor)} (${escapeHtml(p.forma)}) <button class="red" style="padding:1px 5px;font-size:10px" onclick="excluirPagamentoOS(${i},'${p.id}')">x</button>`).join('<br>') + `</div>` : '';
     listaOS.innerHTML += `<tr>
       <td>${escapeHtml(o.cliente)}</td>
       <td>${escapeHtml(o.veiculo||'-')}</td>
       <td>${escapeHtml(o.placa||'-')}</td>
       <td>${moeda(o.total)}</td>
-      <td><span class="badge green">Aprovado</span></td>
+      <td>${statusBadge}</td>
       <td><select onchange="vincularFuncionarioOS(${i},this.value)">${optionsFuncionarios}</select></td>
       <td>
-        <div class="actions" style="margin-top:0">
-          <button class="green" onclick="receberOS(${i},'PIX')">Pix</button>
-          <button class="green" onclick="receberOS(${i},'DINHEIRO')">Dinheiro</button>
-          <button class="green" onclick="receberOS(${i},'CARTÃO')">Cartão</button>
-        </div>
+        <div style="font-size:12px"><strong>Pago: ${moeda(totalPago)}</strong> de ${moeda(o.total)}<br>Saldo: ${moeda(saldo)}</div>
+        <button class="green" style="margin-top:5px" onclick="abrirLancarPagamentoOS(${i})">Lançar pagamento</button>
+        ${listaPagamentos}
       </td>
       <td>
         <button class="gray" onclick="editarOrdemServico(${i})">Editar OS</button>
@@ -1624,22 +1665,70 @@ function vincularFuncionarioOS(i, funcionarioId){
   renderOS();
 }
 
-function receberOS(i, forma){
-  const o=serviceOrders[i];
-  if(!o)return;
-  if(!confirm('Confirmar recebimento desta Ordem de Serviço via '+forma+'?\n\nCliente: '+(o.cliente||'-')+'\nVeículo: '+(o.veiculo||'-')+' '+(o.placa||'-')+'\nValor: '+moeda(o.total)+'\n\nEla sairá da lista de OS em andamento e irá para Serviços Concluídos.')) return;
+function abrirLancarPagamentoOS(i){
+  const os=serviceOrders[i]; if(!os)return;
+  window.__osPagamentoIndex=i;
+  const totalPago=_totalPagoOS(os);
+  const saldo=Math.max(0, Number(os.total||0)-totalPago);
+  document.getElementById('opResumo').innerHTML = `<strong>${escapeHtml(os.cliente||'-')}</strong> — ${escapeHtml(os.veiculo||'-')} ${escapeHtml(os.placa||'-')}<br>Total: ${moeda(os.total)} · Já pago: ${moeda(totalPago)} · Saldo: <strong>${moeda(saldo)}</strong>`;
+  document.getElementById('opValor').value = saldo>0?saldo.toFixed(2):'';
+  document.getElementById('opData').value = dataHojeISO();
+  document.getElementById('opForma').value = 'Dinheiro';
+  document.getElementById('opObs').value='';
+  modalPagamentoOSOverlay.classList.add('aberto');
+}
+function fecharModalPagamentoOS(){ modalPagamentoOSOverlay.classList.remove('aberto'); }
+function confirmarPagamentoOS(){
+  const i=window.__osPagamentoIndex;
+  const os=serviceOrders[i]; if(!os)return;
+  const valor=Number(document.getElementById('opValor').value||0);
+  const data=document.getElementById('opData').value;
+  const forma=document.getElementById('opForma').value;
+  const obs=document.getElementById('opObs').value.trim();
+  if(valor<=0){alert('Informe o valor recebido.');return}
+  if(!data){alert('Informe a data do pagamento.');return}
 
+  if(!os.pagamentos) os.pagamentos=[];
+  const pagamentoId = Date.now()+Math.floor(Math.random()*100000);
+  const entradaId = pagamentoId+1;
+  os.pagamentos.push({id:pagamentoId, valor, data, forma, obs, entradaId});
+
+  // lança a entrada financeira exatamente na data do recebimento, sem duplicar
   entradas.push({
-    id:Date.now(),
-    data:dataHojeISO(),
-    descricao:'OS - '+o.cliente+' - '+(o.veiculo||'')+' '+(o.placa||''),
-    valor:Number(o.total||0),
-    forma:forma,
+    id:entradaId,
+    data:data,
+    descricao:'OS - '+os.cliente+' - '+(os.veiculo||'')+' '+(os.placa||''),
+    valor:valor,
+    forma:forma.toUpperCase(),
     origem:'Ordem de Serviço',
-    osRef:o.quoteId
+    osRef:os.quoteId
   });
 
+  const totalPago=_totalPagoOS(os);
+  fecharModalPagamentoOS();
+
+  if(totalPago >= Number(os.total||0) - 0.009){
+    if(confirm('Este pagamento quita o valor total da OS. Ela será movida para Serviços Concluídos. Confirmar?')){
+      _finalizarOS(i);
+      return;
+    }
+  }
+  renderOS(); renderEntradas(); atualizarDashboard(); salvarAgora();
+}
+function excluirPagamentoOS(i, pagamentoId){
+  const os=serviceOrders[i]; if(!os)return;
+  if(!confirm('Tem certeza de que deseja excluir este pagamento? Esta ação não poderá ser desfeita.'))return;
+  const pag = (os.pagamentos||[]).find(p=>String(p.id)===String(pagamentoId));
+  if(pag && pag.entradaId){
+    entradas = entradas.filter(e=>e.id!==pag.entradaId);
+  }
+  os.pagamentos = (os.pagamentos||[]).filter(p=>String(p.id)!==String(pagamentoId));
+  renderOS(); renderEntradas(); atualizarDashboard(); salvarAgora();
+}
+function _finalizarOS(i){
+  const o=serviceOrders[i]; if(!o)return;
   const func = funcionarios.find(f=>String(f.id)===String(o.funcionarioId));
+  const formasUsadas = [...new Set((o.pagamentos||[]).map(p=>p.forma))];
   servicosConcluidos.push({
     id:Date.now()+1,
     quoteId:o.quoteId,
@@ -1650,10 +1739,13 @@ function receberOS(i, forma){
     km:o.km||'',
     obs:o.obs||'',
     clientId:o.clientId||null,
+    subtotal:o.subtotal!=null?o.subtotal:o.total,
+    desconto:o.desconto||0,
     total:o.total,
-    forma:forma,
+    forma: formasUsadas.length===1 ? formasUsadas[0] : 'Múltiplas formas',
     funcionario: func ? func.nome : '',
-    items:JSON.parse(JSON.stringify(o.items||[]))
+    items:JSON.parse(JSON.stringify(o.items||[])),
+    pagamentos:JSON.parse(JSON.stringify(o.pagamentos||[]))
   });
 
   const q = quotes.find(x=>x.id===o.quoteId);
@@ -1729,7 +1821,7 @@ function renderConcluidos(){
 function gerarPDFConcluido(id){
   const s = servicosConcluidos.find(x=>x.id===id);
   if(!s)return;
-  const qFake = {id:'concluido_'+s.id, number:String(s.quoteId||s.id).slice(-4), cliente:s.cliente, placa:s.placa, veiculo:s.veiculo, total:s.total, items:s.items||[], createdAt:s.data};
+  const qFake = {id:'concluido_'+s.id, number:String(s.quoteId||s.id).slice(-4), cliente:s.cliente, placa:s.placa, veiculo:s.veiculo, subtotal:s.subtotal, desconto:s.desconto||0, total:s.total, items:s.items||[], createdAt:s.data};
   const pdfQuotesBackup = quotes.slice();
   quotes.push(qFake);
   gerarPDF(qFake.id);
@@ -2099,6 +2191,7 @@ function gerarPDF(id){
     .totalBox{background:#f59e0b;color:#111827;border-radius:10px;padding:14px 18px;min-width:280px;text-align:right}
     .totalBox small{display:block;font-size:11px;text-transform:uppercase;font-weight:900}
     .totalBox strong{font-size:24px}
+    .totalBox .sublinha{font-size:12px;font-weight:700;margin-bottom:4px;opacity:.85}
     @media print{
       body{background:white}
       .page{width:100%;min-height:auto;margin:0;padding:20px}
@@ -2140,6 +2233,7 @@ function gerarPDF(id){
 
     <div class="total">
       <div class="totalBox">
+        ${Number(q.desconto||0)>0 ? `<div class="sublinha">Subtotal: ${moeda(q.subtotal!=null?q.subtotal:totalItens(q.items))}</div><div class="sublinha">Desconto: -${moeda(q.desconto)}</div>` : ''}
         <small>Valor total do orçamento</small>
         <strong>${moeda(q.total)}</strong>
       </div>
@@ -3232,7 +3326,7 @@ function renderMovimentacoes(){
 function abrirDetalheOS(quoteId){
   const os = servicosConcluidos.find(s=>String(s.quoteId)===String(quoteId));
   if(!os){ alert('Não foi possível localizar os dados completos deste serviço.'); return; }
-  const entrada = entradas.find(e=>String(e.osRef)===String(quoteId));
+  const entradasDaOS = entradas.filter(e=>String(e.osRef)===String(quoteId));
 
   const valorCobrado = Number(os.total||0);
   const items = os.items||[];
@@ -3252,9 +3346,11 @@ function abrirDetalheOS(quoteId){
     </tr>`;
   }).join('');
 
-  const valorLiquidoReal = entrada ? Number(entrada.valorLiquido!=null?entrada.valorLiquido:entrada.valor||0) : valorCobrado;
-  const taxaMaquininha = entrada ? (Number(entrada.valor||0) - valorLiquidoReal) : 0;
+  const valorBrutoRecebido = entradasDaOS.reduce((s,e)=>s+Number(e.valor||0),0);
+  const valorLiquidoReal = entradasDaOS.length ? entradasDaOS.reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0) : valorCobrado;
+  const taxaMaquininha = entradasDaOS.length ? (valorBrutoRecebido - valorLiquidoReal) : 0;
   const lucroLiquido = valorLiquidoReal - totalCustoPecas;
+  const linhasPagamentos = (os.pagamentos&&os.pagamentos.length) ? os.pagamentos.map(p=>`${dataBR(p.data)} — ${moeda(p.valor)} (${escapeHtml(p.forma)})`).join('<br>') : '';
 
   document.getElementById('odDetalheConteudo').innerHTML = `
     <div class="grid2" style="margin-bottom:10px">
@@ -3265,6 +3361,8 @@ function abrirDetalheOS(quoteId){
       <div><small class="muted">Forma de pagamento</small><div style="font-weight:800">${escapeHtml(os.forma||'-')}</div></div>
       <div><small class="muted">Mecânico</small><div style="font-weight:800">${escapeHtml(os.funcionario||'-')}</div></div>
     </div>
+    ${linhasPagamentos?`<div class="muted" style="margin-bottom:10px"><strong>Pagamentos recebidos:</strong><br>${linhasPagamentos}</div>`:''}
+    ${Number(os.desconto||0)>0?`<div class="muted" style="margin-bottom:10px">Subtotal: ${moeda(os.subtotal!=null?os.subtotal:valorCobrado+Number(os.desconto||0))} · Desconto aplicado: -${moeda(os.desconto)}</div>`:''}
     <table class="rec-table">
       <thead><tr><th>Item</th><th>Qtd</th><th>Custo unit.</th><th>Venda unit.</th><th>Total venda</th></tr></thead>
       <tbody>${linhasItens || '<tr><td colspan="5" class="muted">Sem itens detalhados.</td></tr>'}</tbody>
