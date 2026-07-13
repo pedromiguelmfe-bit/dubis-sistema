@@ -308,8 +308,6 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
   <div id="finResumo" class="finance-subsection active">
     <div class="cards">
       <div class="card"><small>Precisa pagar no filtro</small><h3 id="finTotalPagar">R$ 0,00</h3></div>
-      <div class="card"><small>Entrou no filtro</small><h3 id="finTotalEntrou">R$ 0,00</h3></div>
-      <div class="card"><small>Saídas no filtro</small><h3 id="finTotalSaidas">R$ 0,00</h3></div>
       <div class="card"><small>Saldo do filtro</small><h3 id="finSaldoFiltro">R$ 0,00</h3></div>
       <div class="card"><small>Contas vencidas</small><h3 id="finVencidas">R$ 0,00</h3></div>
     </div>
@@ -2611,7 +2609,9 @@ function renderFinanceiro(){
     });
   }
   if(mostrarSaidas){
-    saidas.filter(s=>_dentroDoPeriodo(s.data)).forEach(s=>{
+    // saídas geradas por uma conta paga não entram aqui de novo — a própria conta já
+    // aparece na lista com status "Pago" quando "Mostrar contas a pagar" está marcado.
+    saidas.filter(s=>s.origem!=='ContaPaga' && _dentroDoPeriodo(s.data)).forEach(s=>{
       if(busca && !String(s.descricao||'').toLowerCase().includes(busca)) return;
       itensVisiveis.push({data:s.data, tipoLinha:'saida', ref:s});
     });
@@ -3399,8 +3399,6 @@ function atualizarResumoFinanceiro(filtro='todos'){
   const totalSaidas=saidasFiltradas.reduce((s,e)=>s+Number(e.valor||0),0);
   const vencidas=finance.filter(c=>c.status==='Vencido').reduce((s,c)=>s+Number(c.valor||0),0);
   if(document.getElementById('finTotalPagar')) finTotalPagar.innerText=moeda(totalPagar);
-  if(document.getElementById('finTotalEntrou')) finTotalEntrou.innerText=moeda(totalEntrou);
-  if(document.getElementById('finTotalSaidas')) finTotalSaidas.innerText=moeda(totalSaidas);
   if(document.getElementById('finSaldoFiltro')) finSaldoFiltro.innerText=moeda(totalEntrou-totalPagar-totalSaidas);
   if(document.getElementById('finVencidas')) finVencidas.innerText=moeda(vencidas);
 }
