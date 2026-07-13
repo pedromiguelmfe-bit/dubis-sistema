@@ -1557,6 +1557,7 @@ function vincularFuncionarioOS(i, funcionarioId){
 function receberOS(i, forma){
   const o=serviceOrders[i];
   if(!o)return;
+  if(!confirm('Confirmar recebimento desta Ordem de Serviço via '+forma+'?\n\nCliente: '+(o.cliente||'-')+'\nVeículo: '+(o.veiculo||'-')+' '+(o.placa||'-')+'\nValor: '+moeda(o.total)+'\n\nEla sairá da lista de OS em andamento e irá para Serviços Concluídos.')) return;
 
   entradas.push({
     id:Date.now(),
@@ -1618,6 +1619,7 @@ function editarOrdemServico(i){
 function voltarOrdemParaOrcamento(i){
   const os = serviceOrders[i];
   if(!os)return;
+  if(!confirm('Tem certeza de que deseja voltar esta Ordem de Serviço para orçamento?\n\nCliente: '+(os.cliente||'-')+'\nVeículo: '+(os.veiculo||'-')+' '+(os.placa||'-')+'\n\nEla sairá da lista de OS em andamento e voltará para Orçamentos em aberto.')) return;
   const q = quotes.find(x=>x.id===os.quoteId);
   if(q) q.status='Aberto';
   serviceOrders.splice(i,1);
