@@ -439,6 +439,16 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
           <div><small>Total vencido</small><div id="cpResumoVencido">R$ 0,00</div></div>
         </div>
       </div>
+
+      <div class="cp-resumo" style="margin-top:10px">
+        <h4 id="cpResumoMovTitulo">Movimentação do período</h4>
+        <div class="cp-resumo-grid" style="grid-template-columns:repeat(4,1fr)">
+          <div><small>Contas pagas no período</small><div id="cpResumoContasPagas">R$ 0,00</div></div>
+          <div><small>Entradas do período</small><div id="cpResumoEntradasMov">R$ 0,00</div></div>
+          <div><small>Saídas do período</small><div id="cpResumoSaidasMov">R$ 0,00</div></div>
+          <div><small>Saldo final</small><div id="cpResumoSaldoMov">R$ 0,00</div></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2592,6 +2602,20 @@ function renderFinanceiro(){
   setTxt('cpResumoPendente', moeda(totalPendente));
   setTxt('cpResumoQtd', qtd + (qtd===1?' conta':' contas'));
   setTxt('cpResumoVencido', moeda(totalVencido));
+
+  // Movimentação do período: contas pagas + entradas + saídas avulsas, sem duplicar.
+  // Uma conta paga entra aqui só como "conta paga" (já vem de totalPago) — a saída que
+  // ela gerou por trás dos panos não é somada de novo em "saídas do período".
+  const entradasNoPeriodo = entradas.filter(e=>_dentroDoPeriodo(e.data));
+  const saidasAvulsasNoPeriodo = saidas.filter(s=>s.origem!=='ContaPaga' && _dentroDoPeriodo(s.data));
+  const totalEntradasMov = entradasNoPeriodo.reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
+  const totalSaidasMov = saidasAvulsasNoPeriodo.reduce((s,x)=>s+Number(x.valor||0),0);
+  const saldoMov = totalEntradasMov - totalPago - totalSaidasMov;
+  setTxt('cpResumoMovTitulo', 'Movimentação — '+tituloPeriodo);
+  setTxt('cpResumoContasPagas', moeda(totalPago));
+  setTxt('cpResumoEntradasMov', moeda(totalEntradasMov));
+  setTxt('cpResumoSaidasMov', moeda(totalSaidasMov));
+  setTxt('cpResumoSaldoMov', moeda(saldoMov));
 
   // monta a lista combinada: contas (sempre) + entradas/saídas (se marcado), todas no mesmo período
   let itensVisiveis = [];
