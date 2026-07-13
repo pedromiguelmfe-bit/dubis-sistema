@@ -420,7 +420,10 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:6px 0 10px">
         <input id="cpBusca" class="inline-input" style="max-width:340px" placeholder="Buscar por descrição..." oninput="renderFinanceiro()">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;font-weight:700"><input type="checkbox" id="cpMostrarContas" checked style="width:auto" onchange="renderFinanceiro()"> Mostrar contas a pagar</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;font-weight:700"><input type="checkbox" id="cpMostrarPagas" style="width:auto" onchange="renderFinanceiro()"> Mostrar contas pagas</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;font-weight:700"><input type="checkbox" id="cpMostrarSaidas" style="width:auto" onchange="renderFinanceiro()"> Mostrar saídas</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;font-weight:700"><input type="checkbox" id="cpMostrarEntradas" style="width:auto" onchange="renderFinanceiro()"> Mostrar entradas</label>
       </div>
 
       <table class="finance-table">
@@ -2511,6 +2514,28 @@ function _linhaContaHtml(c,i){
       <td style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="editarConta(${i})">Editar</button><button class="red" onclick="excluirConta(${i})">Excluir</button></td>
     </tr>`;
 }
+function _linhaEntradaResumoHtml(e){
+  return `<tr class="status-pago">
+      <td>${dataBR(e.data)}</td>
+      <td>${escapeHtml(e.descricao||'')}</td>
+      <td><span class="badge green">Entrada</span></td>
+      <td>${moeda(e.valorLiquido!=null?e.valorLiquido:e.valor)}</td>
+      <td><span class="badge green">${escapeHtml(e.situacao||'Recebido')}</span></td>
+      <td>-</td>
+      <td class="muted">Editar em Entradas</td>
+    </tr>`;
+}
+function _linhaSaidaResumoHtml(s){
+  return `<tr class="status-vencido">
+      <td>${dataBR(s.data)}</td>
+      <td>${escapeHtml(s.descricao||'')}</td>
+      <td><span class="badge red">Saída</span></td>
+      <td>${moeda(s.valor)}</td>
+      <td><span class="badge red">Realizada</span></td>
+      <td>-</td>
+      <td class="muted">Editar em Saídas</td>
+    </tr>`;
+}
 function renderFinanceiro(){
   if(!document.getElementById('listaContasPagar'))return;
   finance.forEach(statusAutomaticoConta);
@@ -2518,30 +2543,43 @@ function renderFinanceiro(){
   renderBarraMeses();
 
   const busca=(document.getElementById('cpBusca')?.value||'').trim().toLowerCase();
+  const mostrarContas=document.getElementById('cpMostrarContas')?.checked??true;
   const mostrarPagas=document.getElementById('cpMostrarPagas')?.checked||false;
+  const mostrarSaidas=document.getElementById('cpMostrarSaidas')?.checked||false;
+  const mostrarEntradas=document.getElementById('cpMostrarEntradas')?.checked||false;
   const filtroData=window.cpFiltroData;
+  let modoAntigas = (!filtroData && window.mesSelecionadoFinanceiro==='antigas');
 
-  let periodoContas, tituloPeriodo, modoAntigas=false;
-
-  if(filtroData){
-    periodoContas = finance.filter(c=>{
-      const d=String(c.data||'').slice(0,10);
+  // mesmo critério de período usado para contas, entradas e saídas — assim o filtro do
+  // calendário (data específica, período, mês ou "antigas") vale pra tudo junto.
+  function _dentroDoPeriodo(dataStr){
+    const d=String(dataStr||'').slice(0,10);
+    if(filtroData){
       if(filtroData.tipo==='data') return d===filtroData.valor;
       if(filtroData.tipo==='periodo') return d && d>=filtroData.inicio && d<=filtroData.fim;
       return true;
-    });
+    }
+    if(window.mesSelecionadoFinanceiro==='antigas'){
+      const atual=mesAtualISO();
+      const m=d.slice(0,7);
+      return m && m<atual;
+    }
+    const mesRef=window.mesSelecionadoFinanceiro||mesAtualISO();
+    return d.slice(0,7)===mesRef;
+  }
+
+  let tituloPeriodo;
+  if(filtroData){
     tituloPeriodo = filtroData.tipo==='data' ? ('Contas de '+dataBR(filtroData.valor)) : ('Contas de '+dataBR(filtroData.inicio)+' até '+dataBR(filtroData.fim));
-  } else if(window.mesSelecionadoFinanceiro==='antigas'){
-    modoAntigas=true;
-    const atual=mesAtualISO();
-    periodoContas = finance.filter(c=>{ const m=String(c.data||'').slice(0,7); return m && m<atual; });
+  } else if(modoAntigas){
     tituloPeriodo = 'Contas antigas';
   } else {
     const mesRef = window.mesSelecionadoFinanceiro || mesAtualISO();
-    periodoContas = finance.filter(c=>String(c.data||'').slice(0,7)===mesRef);
     const lbl=_mesLabelPt(mesRef);
     tituloPeriodo = lbl.charAt(0).toUpperCase()+lbl.slice(1);
   }
+
+  const periodoContas = finance.filter(c=>_dentroDoPeriodo(c.data));
 
   const totalListado = periodoContas.reduce((s,c)=>s+Number(c.valor||0),0);
   const totalPago = periodoContas.filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
@@ -2557,30 +2595,51 @@ function renderFinanceiro(){
   setTxt('cpResumoQtd', qtd + (qtd===1?' conta':' contas'));
   setTxt('cpResumoVencido', moeda(totalVencido));
 
-  let visiveis = periodoContas.filter(c=>{
-    if(!mostrarPagas && c.status==='Pago') return false;
-    if(busca && !String(c.descricao||'').toLowerCase().includes(busca)) return false;
-    return true;
-  });
-  visiveis.sort((a,b)=>String(a.data||'9999-12-31').localeCompare(String(b.data||'9999-12-31')));
+  // monta a lista combinada: contas (sempre) + entradas/saídas (se marcado), todas no mesmo período
+  let itensVisiveis = [];
+  if(mostrarContas){
+    periodoContas.forEach(c=>{
+      if(!mostrarPagas && c.status==='Pago') return;
+      if(busca && !String(c.descricao||'').toLowerCase().includes(busca)) return;
+      itensVisiveis.push({data:c.data, tipoLinha:'conta', ref:c, idx:finance.indexOf(c)});
+    });
+  }
+  if(mostrarEntradas){
+    entradas.filter(e=>_dentroDoPeriodo(e.data)).forEach(e=>{
+      if(busca && !String(e.descricao||'').toLowerCase().includes(busca)) return;
+      itensVisiveis.push({data:e.data, tipoLinha:'entrada', ref:e});
+    });
+  }
+  if(mostrarSaidas){
+    saidas.filter(s=>_dentroDoPeriodo(s.data)).forEach(s=>{
+      if(busca && !String(s.descricao||'').toLowerCase().includes(busca)) return;
+      itensVisiveis.push({data:s.data, tipoLinha:'saida', ref:s});
+    });
+  }
+  itensVisiveis.sort((a,b)=>String(a.data||'9999-12-31').localeCompare(String(b.data||'9999-12-31')));
+
+  const linhaDoItem = (it)=>{
+    if(it.tipoLinha==='entrada') return _linhaEntradaResumoHtml(it.ref);
+    if(it.tipoLinha==='saida') return _linhaSaidaResumoHtml(it.ref);
+    return _linhaContaHtml(it.ref, it.idx);
+  };
 
   listaContasPagar.innerHTML='';
-  if(visiveis.length===0){
-    listaContasPagar.innerHTML='<tr><td colspan="7" class="muted">Nenhuma conta encontrada.</td></tr>';
+  if(itensVisiveis.length===0){
+    listaContasPagar.innerHTML='<tr><td colspan="7" class="muted">Nenhum lançamento encontrado para esse filtro.</td></tr>';
   } else if(modoAntigas){
     let grupoAtual=null;
-    visiveis.forEach(c=>{
-      const idx=finance.indexOf(c);
-      const mesC=String(c.data||'').slice(0,7);
+    itensVisiveis.forEach(it=>{
+      const mesC=String(it.data||'').slice(0,7);
       if(mesC!==grupoAtual){
         grupoAtual=mesC;
         const lbl=_mesLabelPt(mesC);
         listaContasPagar.innerHTML += `<tr><td colspan="7" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
       }
-      listaContasPagar.innerHTML += _linhaContaHtml(c,idx);
+      listaContasPagar.innerHTML += linhaDoItem(it);
     });
   } else {
-    visiveis.forEach(c=>{ listaContasPagar.innerHTML += _linhaContaHtml(c, finance.indexOf(c)); });
+    itensVisiveis.forEach(it=>{ listaContasPagar.innerHTML += linhaDoItem(it); });
   }
 
   renderEntradas();
