@@ -93,6 +93,24 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 .cp-calendario-popover input{width:100%;margin-top:4px}
 .cp-calendario-popover hr{margin:10px 0;border:none;border-top:1px solid #e5e7eb}
 .mes-sep{background:#f9fafb;font-weight:800;color:#374151;padding:8px 10px !important;font-size:13px}
+.calfin-nav{display:flex;align-items:center;gap:12px;margin:10px 0}
+.calfin-nav button{padding:6px 12px}
+.calfin-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px}
+.calfin-head{font-size:11px;font-weight:800;text-transform:uppercase;color:#6b7280;text-align:center;padding:4px 0}
+.calfin-cel{border:1px solid #e5e7eb;border-radius:8px;min-height:78px;padding:6px;cursor:pointer;font-size:11px;background:#fff}
+.calfin-cel:hover{border-color:#f59e0b}
+.calfin-cel.vazio{border:none;cursor:default;background:transparent}
+.calfin-cel.hoje{border-color:#f59e0b;border-width:2px}
+.calfin-num{font-weight:800;font-size:12px;color:#374151;margin-bottom:3px}
+.calfin-item{border-radius:4px;padding:1px 4px;margin-top:2px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.calfin-item.cor-verde{background:#16a34a}
+.calfin-item.cor-vermelho{background:#dc2626}
+.calfin-item.cor-laranja{background:#f59e0b}
+.calfin-item.cor-amar{background:#eab308;color:#111}
+.calfin-item.cor-cinza{background:#9ca3af}
+.calfin-item.cor-entrada{background:#059669}
+.calfin-mais{font-size:10px;color:#6b7280;margin-top:2px;font-weight:700}
+@media(max-width:950px){.calfin-cel{min-height:50px;padding:3px}.calfin-item{display:none}.calfin-mais{display:none}}
 .cp-resumo{margin-top:16px;border:1px solid #e5e7eb;border-radius:12px;padding:14px}
 .cp-resumo h4{margin:0 0 10px 0;color:#f59e0b}
 .cp-resumo-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
@@ -282,6 +300,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <button onclick="abrirFinanceiro('finEntradas', this)">Entradas</button>
       <button onclick="abrirFinanceiro('finSaidas', this)">Saídas</button>
       <button onclick="abrirFinanceiro('finMovimentacoes', this)">Movimentações e Resultados</button>
+      <button onclick="abrirFinanceiro('finCalendario', this)">Calendário Financeiro</button>
       <button class="dark" onclick="gerarRelatorioMensal()">Relatório mensal PDF</button>
     </div>
   </div>
@@ -632,6 +651,46 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     </div>
   </div>
 
+  <div id="finCalendario" class="finance-subsection">
+    <div class="panel">
+      <div class="cp-topo">
+        <div>
+          <h3>Calendário Financeiro</h3>
+          <p class="muted">Acompanhe entradas e contas a pagar dia a dia. Clique num dia para ver o detalhe completo e o saldo daquele dia.</p>
+        </div>
+      </div>
+
+      <div class="cp-filtros" id="calFinModos">
+        <button class="cp-filtro" data-modo="contas" onclick="calFinSelecionarModo('contas')">Contas a pagar</button>
+        <button class="cp-filtro" data-modo="entradas" onclick="calFinSelecionarModo('entradas')">Entradas</button>
+        <button class="cp-filtro" data-modo="completa" onclick="calFinSelecionarModo('completa')">Visão completa</button>
+      </div>
+
+      <div class="calfin-nav">
+        <button class="gray" onclick="calFinMesAnterior()">‹ Mês anterior</button>
+        <strong id="calFinTitulo">-</strong>
+        <button class="gray" onclick="calFinProximoMes()">Próximo mês ›</button>
+        <button class="gray" onclick="calFinIrParaHoje()">Hoje</button>
+      </div>
+
+      <div class="calfin-grid">
+        <div class="calfin-head">Dom</div><div class="calfin-head">Seg</div><div class="calfin-head">Ter</div>
+        <div class="calfin-head">Qua</div><div class="calfin-head">Qui</div><div class="calfin-head">Sex</div><div class="calfin-head">Sáb</div>
+      </div>
+      <div class="calfin-grid" id="calFinGrid"></div>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalCalFinDiaOverlay">
+    <div class="cp-modal wide">
+      <h3 id="calFinDiaTitulo">Movimentações do dia</h3>
+      <div id="calFinDiaConteudo"></div>
+      <div class="actions">
+        <button class="gray" onclick="calFinFecharDia()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="cp-modal-overlay" id="modalDetalheOSOverlay">
     <div class="cp-modal wide">
       <h3>Detalhamento do serviço</h3>
@@ -970,7 +1029,7 @@ async function iniciarApp(){
 function renderTudo(){
   limparOrcamentosAntigos();
   renderQuotes(); renderOS(); renderFinanceiro('todos'); renderEntradas();
-  renderSaidas(); renderClientes(); renderFuncionarios(); renderConcluidos(); renderMovimentacoes(); renderEstoque();
+  renderSaidas(); renderClientes(); renderFuncionarios(); renderConcluidos(); renderMovimentacoes(); renderCalendarioFinanceiro(); renderEstoque();
   atualizarDashboard();
 }
 function abrir(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');titulo.innerText={dashboard:'Dashboard',orcamentos:'Orçamentos',os:'Ordens de Serviço',concluidos:'Serviços Concluídos',financeiro:'Financeiro',estoque:'Estoque',fornecedores:'Fornecedores',funcionarios:'Funcionários',clientes:'Clientes'}[id]}
@@ -997,7 +1056,7 @@ function abrirFinanceiro(id,btn){
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.finance-tabs button').forEach(b=>b.classList.remove('activeTab'));
   if(btn)btn.classList.add('activeTab');
-  renderFinanceiro(window.filtroAtual||'todos'); renderEntradas(); renderSaidas(); renderMovimentacoes(); atualizarResumoFinanceiro(window.filtroAtual||'todos');
+  renderFinanceiro(window.filtroAtual||'todos'); renderEntradas(); renderSaidas(); renderMovimentacoes(); renderCalendarioFinanceiro(); atualizarResumoFinanceiro(window.filtroAtual||'todos');
 }
 
 function atualizarDashboard(){
@@ -2867,6 +2926,7 @@ function renderEntradas(){
     visiveis.forEach(e=>{ tabela.innerHTML += _linhaEntradaHtml(e, entradas.indexOf(e)); });
   }
   if(typeof renderMovimentacoes==='function') renderMovimentacoes();
+  if(typeof renderCalendarioFinanceiro==='function') renderCalendarioFinanceiro();
 }
 
 function alterarCampoEntrada(i,campo,valor){
@@ -3142,6 +3202,121 @@ function abrirDetalheOS(quoteId){
   modalDetalheOSOverlay.classList.add('aberto');
 }
 function fecharModalDetalheOS(){ modalDetalheOSOverlay.classList.remove('aberto'); }
+
+/* ===== Calendário Financeiro ===== */
+function moedaCurta(v){
+  const n = Math.round(Number(v||0));
+  return 'R$'+n.toLocaleString('pt-BR');
+}
+function _primeiroDiaSemanaMes(ano,mes){ return new Date(ano, mes-1, 1).getDay(); } // 0=domingo
+function calFinSelecionarModo(modo){
+  window.calFinModo=modo;
+  renderCalendarioFinanceiro();
+}
+function calFinMesAnterior(){
+  window.calFinMesRef = _mesAnteriorISO(window.calFinMesRef||mesAtualISO());
+  renderCalendarioFinanceiro();
+}
+function calFinProximoMes(){
+  window.calFinMesRef = _proximoMesISO(window.calFinMesRef||mesAtualISO());
+  renderCalendarioFinanceiro();
+}
+function calFinIrParaHoje(){
+  window.calFinMesRef = mesAtualISO();
+  renderCalendarioFinanceiro();
+}
+function _mesAnteriorISO(mesRefISO){
+  const [ano,mes]=mesRefISO.split('-').map(Number);
+  const d=new Date(ano, mes-2, 1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function renderCalendarioFinanceiro(){
+  const cont=document.getElementById('calFinGrid');
+  if(!cont)return;
+  const modo=window.calFinModo||'completa';
+  const mesRef=window.calFinMesRef||mesAtualISO();
+  const [ano,mes]=mesRef.split('-').map(Number);
+  const ultimoDia=_ultimoDiaMes(ano,mes);
+  const primeiroDiaSemana=_primeiroDiaSemanaMes(ano,mes);
+
+  document.getElementById('calFinTitulo').innerText = (()=>{const l=_mesLabelPt(mesRef); return l.charAt(0).toUpperCase()+l.slice(1);})();
+  document.querySelectorAll('#calFinModos .cp-filtro').forEach(b=>b.classList.toggle('ativo', b.dataset.modo===modo));
+
+  const mapa={};
+  const addItem=(dataISO,item)=>{
+    const dia=Number(String(dataISO).slice(8,10));
+    if(!dia)return;
+    if(!mapa[dia])mapa[dia]=[];
+    mapa[dia].push(item);
+  };
+  if(modo==='contas'||modo==='completa'){
+    finance.forEach(c=>{
+      const d=String(c.data||'');
+      if(d.slice(0,7)!==mesRef)return;
+      const st=statusAutomaticoConta(c);
+      const cor = st==='Pago'?'verde':st==='Vencido'?'vermelho':st==='Vence hoje'?'laranja':st==='Aguardando valor'?'cinza':'amar';
+      addItem(d,{desc:c.descricao,valor:c.valor,cor});
+    });
+  }
+  if(modo==='entradas'||modo==='completa'){
+    entradas.forEach(e=>{
+      const d=String(e.data||'');
+      if(d.slice(0,7)!==mesRef)return;
+      addItem(d,{desc:e.descricao,valor:(e.valorLiquido!=null?e.valorLiquido:e.valor),cor:'entrada'});
+    });
+  }
+
+  const hojeISO=dataHojeISO();
+  let html='';
+  for(let i=0;i<primeiroDiaSemana;i++) html+='<div class="calfin-cel vazio"></div>';
+  for(let dia=1;dia<=ultimoDia;dia++){
+    const diaISO=mesRef+'-'+String(dia).padStart(2,'0');
+    const itens=mapa[dia]||[];
+    const isHoje=diaISO===hojeISO;
+    const visiveis=itens.slice(0,2);
+    const resto=itens.length-2;
+    const linhas=visiveis.map(it=>`<div class="calfin-item cor-${it.cor}">${escapeHtml(String(it.desc||'').slice(0,14))} ${moedaCurta(it.valor)}</div>`).join('');
+    const maisLink = resto>0 ? `<div class="calfin-mais">+${resto} ${resto>1?'itens':'item'}</div>` : '';
+    html += `<div class="calfin-cel ${isHoje?'hoje':''}" onclick="calFinAbrirDia('${diaISO}')">
+      <div class="calfin-num">${dia}</div>
+      ${linhas}${maisLink}
+    </div>`;
+  }
+  cont.innerHTML=html;
+}
+function calFinAbrirDia(diaISO){
+  const contasDia = finance.filter(c=>String(c.data||'').slice(0,10)===diaISO).sort((a,b)=>String(a.descricao||'').localeCompare(String(b.descricao||'')));
+  const entradasDia = entradas.filter(e=>String(e.data||'').slice(0,10)===diaISO).sort((a,b)=>String(a.descricao||'').localeCompare(String(b.descricao||'')));
+
+  const totalEntradas = entradasDia.reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
+  const totalContas = contasDia.reduce((s,c)=>s+Number(c.valor||0),0);
+  const saldo = totalEntradas - totalContas;
+
+  document.getElementById('calFinDiaTitulo').innerText = 'Movimentações de '+dataBR(diaISO);
+
+  const linhasEntradas = entradasDia.length ? entradasDia.map(e=>`<tr><td>${escapeHtml(e.descricao||'')}</td><td>${escapeHtml(e.forma||'-')}</td><td>${moeda(e.valorLiquido!=null?e.valorLiquido:e.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma entrada neste dia.</td></tr>';
+  const linhasContas = contasDia.length ? contasDia.map(c=>{
+    const st=statusAutomaticoConta(c);
+    const cor = st==='Pago'?'green':st==='Vencido'?'red':st==='Vence hoje'?'orange':st==='Aguardando valor'?'gray':'';
+    return `<tr><td>${escapeHtml(c.descricao||'')}</td><td><span class="badge ${cor}">${st}</span></td><td>${moeda(c.valor)}</td></tr>`;
+  }).join('') : '<tr><td colspan="3" class="muted">Nenhuma conta neste dia.</td></tr>';
+
+  document.getElementById('calFinDiaConteudo').innerHTML = `
+    <h4 style="margin-bottom:6px">Entradas</h4>
+    <table class="rec-table"><thead><tr><th>Descrição</th><th>Forma</th><th>Valor</th></tr></thead><tbody>${linhasEntradas}</tbody></table>
+    <h4 style="margin:14px 0 6px">Contas a pagar</h4>
+    <table class="rec-table"><thead><tr><th>Descrição</th><th>Status</th><th>Valor</th></tr></thead><tbody>${linhasContas}</tbody></table>
+    <div class="cp-resumo" style="margin-top:14px">
+      <div class="cp-resumo-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div><small>Total de entradas</small><div>${moeda(totalEntradas)}</div></div>
+        <div><small>Total de contas</small><div>${moeda(totalContas)}</div></div>
+        <div><small>Saldo do dia</small><div>${moeda(saldo)}</div></div>
+      </div>
+    </div>
+  `;
+  modalCalFinDiaOverlay.classList.add('aberto');
+}
+function calFinFecharDia(){ modalCalFinDiaOverlay.classList.remove('aberto'); }
 
 function atualizarResumoFinanceiro(filtro='todos'){
   const contasFiltradas = finance.filter(c=>contaPassaFiltro(c,filtro));
