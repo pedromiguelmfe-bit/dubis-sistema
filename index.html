@@ -306,7 +306,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <div><label>Buscar serviço concluído (neste mês)</label><input id="buscaConcluidos" placeholder="Nome, placa ou veículo" oninput="pesquisarConcluidos()"></div>
     </div>
     <table>
-      <thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Placa</th><th>Valor</th><th>Forma</th><th>Funcionário</th><th>PDF</th></tr></thead>
+      <thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Placa</th><th>Valor</th><th>Forma</th><th>Funcionário</th><th>Ações</th></tr></thead>
       <tbody id="listaConcluidos"></tbody>
     </table>
     <p class="muted" style="margin-top:10px">Procurando um serviço de um mês anterior? <button class="gray" onclick="irParaMovimentacoesFinanceiro()">Ver no Financeiro</button></p>
@@ -795,9 +795,14 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
   <div class="panel" id="produtividadeFuncionarioPanel" style="display:none">
     <h3>Produtividade</h3>
     <p class="muted">Calculado automaticamente a partir dos itens "Lavagem de Veículo" e "Mão de Obra Mecânica" nas Ordens de Serviço concluídas em que este funcionário foi marcado como responsável.</p>
-    <div class="cp-cards" style="grid-template-columns:repeat(4,1fr)">
-      <div class="cp-card c-verde"><small>Produção da semana</small><div class="cp-val" id="pfSemanaValor">R$ 0,00</div><div class="cp-qtd" id="pfSemanaQtd">0 serviços</div></div>
-      <div class="cp-card c-laranja"><small>Falta pro salário semanal</small><div class="cp-val" id="pfSemanaFalta">-</div></div>
+    <div class="cp-cards" style="grid-template-columns:repeat(3,1fr)">
+      <div class="cp-card c-verde"><small>Total produzido em serviços</small><div class="cp-val" id="pfTotalProduzido">R$ 0,00</div><div class="cp-qtd" id="pfTotalQtd">0 serviços</div></div>
+      <div class="cp-card c-preto"><small>Já recebeu (pagamentos pagos)</small><div class="cp-val" id="pfRecebido">R$ 0,00</div></div>
+      <div class="cp-card c-laranja"><small>Falta receber (pagamentos pendentes)</small><div class="cp-val" id="pfFaltaReceber">R$ 0,00</div></div>
+    </div>
+    <div class="cp-cards" style="grid-template-columns:repeat(4,1fr);margin-top:10px">
+      <div class="cp-card c-cinza"><small>Produção da semana</small><div class="cp-val" id="pfSemanaValor">R$ 0,00</div><div class="cp-qtd" id="pfSemanaQtd">0 serviços</div></div>
+      <div class="cp-card c-amar"><small>Falta pro salário semanal</small><div class="cp-val" id="pfSemanaFalta">-</div></div>
       <div class="cp-card c-preto"><small>Produção do mês</small><div class="cp-val" id="pfMesValor">R$ 0,00</div><div class="cp-qtd" id="pfMesQtd">0 serviços</div></div>
       <div class="cp-card c-cinza"><small>Ticket médio (mês)</small><div class="cp-val" id="pfTicketMedio">R$ 0,00</div></div>
     </div>
@@ -806,6 +811,8 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <div id="pfHistoricoSemanal" class="rec-table-wrap"></div>
       <h4 style="font-size:14px;margin:14px 0 6px">Histórico mensal</h4>
       <div id="pfHistoricoMensal" class="rec-table-wrap"></div>
+      <h4 style="font-size:14px;margin:14px 0 6px">Histórico de serviços executados</h4>
+      <div id="pfHistoricoServicos" class="rec-table-wrap"></div>
     </div>
   </div>
 
@@ -1245,6 +1252,38 @@ function _ehItemProdutividade(desc){
   const d=normalizarTextoBusca(desc||'');
   return d==='lavagem de veículo' || d==='mão de obra mecânica';
 }
+function _pagamentosSemanaisDoFuncionario(funcId){
+  return finance.filter(c=>c.origem==='FuncionarioSemanal' && String(c.funcId)===String(funcId));
+}
+function _recebidoFuncionario(funcId){
+  return _pagamentosSemanaisDoFuncionario(funcId).filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
+}
+function _faltaReceberFuncionario(funcId){
+  return _pagamentosSemanaisDoFuncionario(funcId).filter(c=>c.status!=='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
+}
+function _producaoTotalFuncionario(funcId){
+  let valor=0, qtd=0;
+  servicosConcluidos.forEach(s=>{
+    (s.items||[]).forEach(it=>{
+      if(_ehItemProdutividade(it.desc) && String(it.funcionarioId||'')===String(funcId)){
+        valor += Number(it.qtd||0)*Number(it.valor||0);
+        qtd += Number(it.qtd||0);
+      }
+    });
+  });
+  return {valor, qtd};
+}
+function _servicosExecutadosPorFuncionario(funcId){
+  const linhas=[];
+  servicosConcluidos.forEach(s=>{
+    (s.items||[]).forEach(it=>{
+      if(_ehItemProdutividade(it.desc) && String(it.funcionarioId||'')===String(funcId)){
+        linhas.push({data:s.data, quoteId:s.quoteId, cliente:s.cliente, veiculo:s.veiculo, placa:s.placa, item:it.desc, valor:Number(it.qtd||0)*Number(it.valor||0)});
+      }
+    });
+  });
+  return linhas.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+}
 function _inicioSemanaISO(d){
   const date=new Date(d.getFullYear(),d.getMonth(),d.getDate());
   const dayNum=(date.getDay()+6)%7; // segunda=0 ... domingo=6
@@ -1286,6 +1325,14 @@ function renderProdutividadeFuncionario(f){
   const semana=_producaoFuncionarioPeriodo(f.id, inicioSemana, fimSemana);
   const mes=_producaoFuncionarioPeriodo(f.id, inicioMes, fimMes);
   const ticketMedio = mes.qtd>0 ? mes.valor/mes.qtd : 0;
+  const totalGeral=_producaoTotalFuncionario(f.id);
+  const recebido=_recebidoFuncionario(f.id);
+  const faltaReceber=_faltaReceberFuncionario(f.id);
+
+  document.getElementById('pfTotalProduzido').innerText=moeda(totalGeral.valor);
+  document.getElementById('pfTotalQtd').innerText=totalGeral.qtd+(totalGeral.qtd===1?' serviço':' serviços');
+  document.getElementById('pfRecebido').innerText=moeda(recebido);
+  document.getElementById('pfFaltaReceber').innerText=moeda(faltaReceber);
 
   document.getElementById('pfSemanaValor').innerText=moeda(semana.valor);
   document.getElementById('pfSemanaQtd').innerText=semana.qtd+(semana.qtd===1?' serviço':' serviços');
@@ -1327,6 +1374,20 @@ function renderProdutividadeFuncionario(f){
   }
   htmlMensal+='</tbody></table>';
   document.getElementById('pfHistoricoMensal').innerHTML=htmlMensal;
+
+  // histórico de serviços executados (item a item)
+  const servicos=_servicosExecutadosPorFuncionario(f.id);
+  let htmlServicos;
+  if(servicos.length===0){
+    htmlServicos='<p class="muted">Nenhum serviço registrado ainda para este funcionário.</p>';
+  } else {
+    htmlServicos='<table class="rec-table"><thead><tr><th>Data</th><th>OS</th><th>Cliente</th><th>Veículo</th><th>Serviço</th><th>Valor</th></tr></thead><tbody>';
+    servicos.forEach(l=>{
+      htmlServicos += `<tr><td>${dataBR(l.data)}</td><td>#${escapeHtml(String(l.quoteId||''))}</td><td>${escapeHtml(l.cliente||'-')}</td><td>${escapeHtml(l.veiculo||'-')} ${escapeHtml(l.placa||'')}</td><td>${escapeHtml(l.item)}</td><td>${moeda(l.valor)}</td></tr>`;
+    });
+    htmlServicos+='</tbody></table>';
+  }
+  document.getElementById('pfHistoricoServicos').innerHTML=htmlServicos;
 }
 function renderItens(){
   itensEditaveis.innerHTML='<div class="item-head"><span>Descrição</span><span>Qtd</span><span>Bruto (interno)</span><span>% lucro</span><span>Venda unit.</span><span>Total</span><span></span></div>';
@@ -1951,9 +2012,91 @@ function renderConcluidos(){
       <td>${moeda(s.total)}</td>
       <td>${escapeHtml(s.forma||'-')}</td>
       <td>${escapeHtml(s.funcionario||'-')}</td>
-      <td><button class="dark" onclick="gerarPDFConcluido(${s.id})">PDF</button></td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="dark" onclick="gerarPDFConcluido(${s.id})">PDF</button>
+        <button class="gray" onclick="reabrirParaOS(${s.id})">Reabrir p/ OS</button>
+        <button class="red" onclick="reabrirParaOrcamento(${s.id})">Voltar p/ Orçamento</button>
+      </td>
     </tr>`;
   });
+}
+
+/* ===== Reverter status da OS (corrigir lançamento por engano) ===== */
+function _reverterServicoConcluido(id){
+  const idx = servicosConcluidos.findIndex(x=>x.id===id);
+  if(idx===-1) return null;
+  const s = servicosConcluidos[idx];
+
+  // estorna (remove) as entradas financeiras geradas pelos pagamentos desta OS
+  entradas = entradas.filter(e=>!(e.origem==="Ordem de Serviço" && String(e.osRef)===String(s.quoteId)));
+
+  // devolve ao estoque as peças que tinham sido baixadas
+  (s.items||[]).forEach(it=>{
+    if(!it.estoqueId) return;
+    const pe=estoque.find(x=>String(x.id)===String(it.estoqueId));
+    if(pe && pe.tipo==="Peça" && pe.quantidade!=null){
+      pe.quantidade = Number(pe.quantidade||0) + Number(it.qtd||0);
+    }
+  });
+
+  servicosConcluidos.splice(idx,1);
+  return s;
+}
+function reabrirParaOS(id){
+  const s = servicosConcluidos.find(x=>x.id===id); if(!s)return;
+  if(!confirm(`Reabrir esta Ordem de Serviço?
+
+Cliente: ${s.cliente||'-'}
+Veículo: ${s.veiculo||'-'} ${s.placa||'-'}
+
+Os pagamentos já lançados e a entrada financeira gerada serão removidos, o estoque de peças usadas será devolvido, e ela voltará para "Ordens de serviço aprovadas" para você relançar o pagamento corretamente.
+
+Esta ação não pode ser desfeita automaticamente.`)) return;
+  const removido = _reverterServicoConcluido(id);
+  if(!removido) return;
+
+  const q = quotes.find(x=>x.id===removido.quoteId);
+  if(q) q.status="OS";
+
+  serviceOrders.push({
+    quoteId: removido.quoteId,
+    cliente: removido.cliente,
+    veiculo: removido.veiculo,
+    placa: removido.placa,
+    km: removido.km||"",
+    obs: removido.obs||"",
+    clientId: removido.clientId||null,
+    subtotal: removido.subtotal!=null?removido.subtotal:removido.total,
+    desconto: removido.desconto||0,
+    total: removido.total,
+    status:"Aprovado",
+    items: JSON.parse(JSON.stringify(removido.items||[])),
+    funcionarioId:"",
+    pagamentos:[],
+    createdAt: removido.data
+  });
+
+  renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard(); salvarAgora();
+  alert("Ordem de Serviço reaberta. Ela está novamente em Ordens de serviço aprovadas.");
+}
+function reabrirParaOrcamento(id){
+  const s = servicosConcluidos.find(x=>x.id===id); if(!s)return;
+  if(!confirm(`Voltar este serviço para a etapa de orçamento?
+
+Cliente: ${s.cliente||'-'}
+Veículo: ${s.veiculo||'-'} ${s.placa||'-'}
+
+Os pagamentos já lançados e a entrada financeira gerada serão removidos, o estoque de peças usadas será devolvido, e ele voltará para a lista de orçamentos em aberto.
+
+Esta ação não pode ser desfeita automaticamente.`)) return;
+  const removido = _reverterServicoConcluido(id);
+  if(!removido) return;
+
+  const q = quotes.find(x=>x.id===removido.quoteId);
+  if(q) q.status="Aberto";
+
+  renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard(); salvarAgora();
+  alert("Serviço devolvido para a lista de orçamentos em aberto.");
 }
 
 function gerarPDFConcluido(id){
@@ -2274,9 +2417,13 @@ function renderFuncionarios(){
     const auto = (f.geraSemanal!==false && Number(f.valorSemanal||0)>0)
       ? `<span class="badge green">Pgto semanal: ${moeda(f.valorSemanal)}</span>`
       : '<span class="badge" style="background:#e5e7eb;color:#374151">Sem pgto semanal automático</span>';
+    const producao=_producaoTotalFuncionario(f.id);
+    const recebido=_recebidoFuncionario(f.id);
+    const falta=_faltaReceberFuncionario(f.id);
     return `<div class="client-card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><strong>${escapeHtml(f.nome)}</strong> ${auto}</div>
-      <small>Cargo: ${escapeHtml(f.cargo||'-')} | Tel: ${escapeHtml(f.telefone||'-')} | Admissão: ${f.admissao?dataBR(f.admissao):'-'} | Salário: ${f.salarioMensal?moeda(f.salarioMensal):'-'}</small>
+      <small>Cargo: ${escapeHtml(f.cargo||'-')} | Tel: ${escapeHtml(f.telefone||'-')} | Admissão: ${f.admissao?dataBR(f.admissao):'-'} | Salário: ${f.salarioMensal?moeda(f.salarioMensal):'-'}</small><br>
+      <small style="display:block;margin-top:4px"><strong>Produziu:</strong> ${moeda(producao.valor)} (${producao.qtd} ${producao.qtd===1?'serviço':'serviços'}) &nbsp;·&nbsp; <strong>Recebeu:</strong> ${moeda(recebido)} &nbsp;·&nbsp; <strong>Falta receber:</strong> ${moeda(falta)}</small>
       <div class="actions">
         <button onclick="editarFuncionario('${f.id}')">Abrir / Editar</button>
         <button onclick="historicoFuncionario('${f.id}')">Histórico</button>
