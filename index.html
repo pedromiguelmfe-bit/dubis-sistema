@@ -791,6 +791,24 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <button class="gray" onclick="limparFuncionario()">Cancelar / Limpar</button>
     </div>
   </div>
+
+  <div class="panel" id="produtividadeFuncionarioPanel" style="display:none">
+    <h3>Produtividade</h3>
+    <p class="muted">Calculado automaticamente a partir dos itens "Lavagem de Veículo" e "Mão de Obra Mecânica" nas Ordens de Serviço concluídas em que este funcionário foi marcado como responsável.</p>
+    <div class="cp-cards" style="grid-template-columns:repeat(4,1fr)">
+      <div class="cp-card c-verde"><small>Produção da semana</small><div class="cp-val" id="pfSemanaValor">R$ 0,00</div><div class="cp-qtd" id="pfSemanaQtd">0 serviços</div></div>
+      <div class="cp-card c-laranja"><small>Falta pro salário semanal</small><div class="cp-val" id="pfSemanaFalta">-</div></div>
+      <div class="cp-card c-preto"><small>Produção do mês</small><div class="cp-val" id="pfMesValor">R$ 0,00</div><div class="cp-qtd" id="pfMesQtd">0 serviços</div></div>
+      <div class="cp-card c-cinza"><small>Ticket médio (mês)</small><div class="cp-val" id="pfTicketMedio">R$ 0,00</div></div>
+    </div>
+    <div style="margin-top:14px">
+      <h4 style="font-size:14px;margin-bottom:6px">Histórico semanal</h4>
+      <div id="pfHistoricoSemanal" class="rec-table-wrap"></div>
+      <h4 style="font-size:14px;margin:14px 0 6px">Histórico mensal</h4>
+      <div id="pfHistoricoMensal" class="rec-table-wrap"></div>
+    </div>
+  </div>
+
   <div class="panel">
     <h3>Funcionários cadastrados</h3>
     <div id="listaFuncionarios"></div>
@@ -1058,6 +1076,7 @@ async function iniciarApp(){
   await carregarDadosSalvos();
   if(gerarHorizontePagamentosSemanais(12)) salvarDados();
   if(gerarHorizonteRecorrentes(12)) salvarDados();
+  if(seedItensProdutividade()) salvarDados();
   renderTudo();
 }
 function renderTudo(){
@@ -1210,12 +1229,111 @@ function novoOrcamento(){
 }
 
 function addLinhaItem(item){currentItems.push(item||{desc:'',qtd:1,valorBruto:'',lucroPct:'',valor:0}); renderItens(); atualizarTotalAtual()}
+function seedItensProdutividade(){
+  const nomes=['Lavagem de Veículo','Mão de Obra Mecânica'];
+  let criou=false;
+  nomes.forEach((nome,idx)=>{
+    const jaExiste = estoque.some(it=>normalizarTextoBusca(it.nome)===normalizarTextoBusca(nome));
+    if(!jaExiste){
+      estoque.push({id:Date.now()+idx, tipo:'Serviço', nome:nome, categoria:'Produtividade', fornecedor:'', custo:'', venda:0, quantidade:null, minimo:null, obs:'Item padrão do sistema — vincule um funcionário responsável ao usar no orçamento.'});
+      criou=true;
+    }
+  });
+  return criou;
+}
+function _ehItemProdutividade(desc){
+  const d=normalizarTextoBusca(desc||'');
+  return d==='lavagem de veículo' || d==='mão de obra mecânica';
+}
+function _inicioSemanaISO(d){
+  const date=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const dayNum=(date.getDay()+6)%7; // segunda=0 ... domingo=6
+  date.setDate(date.getDate()-dayNum);
+  return date.toISOString().slice(0,10);
+}
+function _fimSemanaISO(inicioISO){
+  const dt=new Date(inicioISO+'T00:00:00');
+  dt.setDate(dt.getDate()+6);
+  return dt.toISOString().slice(0,10);
+}
+function _producaoFuncionarioPeriodo(funcId, inicioISO, fimISO){
+  let valor=0, qtd=0;
+  servicosConcluidos.forEach(s=>{
+    const d=String(s.data||'').slice(0,10);
+    if(d<inicioISO || d>fimISO) return;
+    (s.items||[]).forEach(it=>{
+      if(_ehItemProdutividade(it.desc) && String(it.funcionarioId||'')===String(funcId)){
+        valor += Number(it.qtd||0)*Number(it.valor||0);
+        qtd += Number(it.qtd||0);
+      }
+    });
+  });
+  return {valor, qtd};
+}
+function renderProdutividadeFuncionario(f){
+  const painel=document.getElementById('produtividadeFuncionarioPanel');
+  if(!painel)return;
+  if(!f){ painel.style.display='none'; return; }
+  painel.style.display='block';
+
+  const hoje=new Date();
+  const inicioSemana=_inicioSemanaISO(hoje);
+  const fimSemana=_fimSemanaISO(inicioSemana);
+  const mesRef=mesAtualISO();
+  const inicioMes=mesRef+'-01';
+  const fimMes=mesRef+'-'+String(_ultimoDiaMes(...mesRef.split('-').map(Number))).padStart(2,'0');
+
+  const semana=_producaoFuncionarioPeriodo(f.id, inicioSemana, fimSemana);
+  const mes=_producaoFuncionarioPeriodo(f.id, inicioMes, fimMes);
+  const ticketMedio = mes.qtd>0 ? mes.valor/mes.qtd : 0;
+
+  document.getElementById('pfSemanaValor').innerText=moeda(semana.valor);
+  document.getElementById('pfSemanaQtd').innerText=semana.qtd+(semana.qtd===1?' serviço':' serviços');
+  document.getElementById('pfMesValor').innerText=moeda(mes.valor);
+  document.getElementById('pfMesQtd').innerText=mes.qtd+(mes.qtd===1?' serviço':' serviços');
+  document.getElementById('pfTicketMedio').innerText=moeda(ticketMedio);
+
+  const metaSemanal=Number(f.valorSemanal||0);
+  if(metaSemanal>0){
+    const falta=Math.max(0, metaSemanal-semana.valor);
+    document.getElementById('pfSemanaFalta').innerText = falta>0 ? moeda(falta) : 'Salário batido ✓';
+  } else {
+    document.getElementById('pfSemanaFalta').innerText='Sem meta semanal cadastrada';
+  }
+
+  // histórico das últimas 6 semanas
+  let htmlSemanal='<table class="rec-table"><thead><tr><th>Semana</th><th>Produção</th><th>Serviços</th></tr></thead><tbody>';
+  let inicioLoop=inicioSemana;
+  for(let i=0;i<6;i++){
+    const fimLoop=_fimSemanaISO(inicioLoop);
+    const p=_producaoFuncionarioPeriodo(f.id, inicioLoop, fimLoop);
+    htmlSemanal += `<tr><td>${dataBR(inicioLoop)} a ${dataBR(fimLoop)}</td><td>${moeda(p.valor)}</td><td>${p.qtd}</td></tr>`;
+    const dt=new Date(inicioLoop+'T00:00:00'); dt.setDate(dt.getDate()-7);
+    inicioLoop=dt.toISOString().slice(0,10);
+  }
+  htmlSemanal+='</tbody></table>';
+  document.getElementById('pfHistoricoSemanal').innerHTML=htmlSemanal;
+
+  // histórico dos últimos 6 meses
+  let htmlMensal='<table class="rec-table"><thead><tr><th>Mês</th><th>Produção</th><th>Serviços</th></tr></thead><tbody>';
+  let mesLoop=mesRef;
+  for(let i=0;i<6;i++){
+    const iniM=mesLoop+'-01';
+    const fimM=mesLoop+'-'+String(_ultimoDiaMes(...mesLoop.split('-').map(Number))).padStart(2,'0');
+    const p=_producaoFuncionarioPeriodo(f.id, iniM, fimM);
+    const lbl=_mesLabelPt(mesLoop);
+    htmlMensal += `<tr><td>${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td><td>${moeda(p.valor)}</td><td>${p.qtd}</td></tr>`;
+    mesLoop=_mesAnteriorISO(mesLoop);
+  }
+  htmlMensal+='</tbody></table>';
+  document.getElementById('pfHistoricoMensal').innerHTML=htmlMensal;
+}
 function renderItens(){
   itensEditaveis.innerHTML='<div class="item-head"><span>Descrição</span><span>Qtd</span><span>Bruto (interno)</span><span>% lucro</span><span>Venda unit.</span><span>Total</span><span></span></div>';
   currentItems.forEach((it,i)=>{
     const total = Number(it.qtd||0)*Number(it.valor||0);
     itensEditaveis.innerHTML += `<div class="item-row">
-      <input placeholder="Descrição" value="${escapeHtml(it.desc||'')}" oninput="currentItems[${i}].desc=this.value">
+      <input placeholder="Descrição" value="${escapeHtml(it.desc||'')}" oninput="currentItems[${i}].desc=this.value" onblur="renderItens()">
       <input type="number" min="0" step="1" value="${it.qtd??1}" onchange="currentItems[${i}].qtd=Number(this.value); renderItens(); atualizarTotalAtual()">
       <input type="number" min="0" step="0.01" placeholder="opcional" value="${it.valorBruto??''}" onchange="currentItems[${i}].valorBruto=this.value; recalcVendaItem(${i})">
       <input type="number" min="0" step="0.1" placeholder="opcional" value="${it.lucroPct??''}" onchange="currentItems[${i}].lucroPct=this.value; recalcVendaItem(${i})">
@@ -1223,6 +1341,13 @@ function renderItens(){
       <span class="item-total">${moeda(total)}</span>
       <button class="red" onclick="removerItem(${i})">×</button>
     </div>`;
+    if(_ehItemProdutividade(it.desc)){
+      const opcoes = '<option value="">Selecione o funcionário responsável</option>' + funcionarios.map(f=>`<option value="${f.id}" ${String(it.funcionarioId||'')===String(f.id)?'selected':''}>${escapeHtml(f.nome)}</option>`).join('');
+      itensEditaveis.innerHTML += `<div style="margin:-4px 0 8px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px">
+        <label style="font-weight:800;color:#92400e">Funcionário responsável (produtividade)</label>
+        <select onchange="currentItems[${i}].funcionarioId=this.value">${opcoes}</select>
+      </div>`;
+    }
   });
 }
 function recalcVendaItem(i){
@@ -1869,6 +1994,7 @@ function limparFuncionario(){
   if(document.getElementById('funcionarioTitulo')) funcionarioTitulo.innerText='Cadastro de funcionários';
   if(document.getElementById('btnSalvarFuncionario')) btnSalvarFuncionario.innerText='Salvar funcionário';
   if(document.getElementById('funcionarioAviso')) funcionarioAviso.innerHTML='';
+  renderProdutividadeFuncionario(null);
 }
 
 function editarFuncionario(id){
@@ -1881,6 +2007,7 @@ function editarFuncionario(id){
   fnGeraSemanal.checked = f.geraSemanal!==false;
   if(document.getElementById('funcionarioTitulo')) funcionarioTitulo.innerText='Editando: '+(f.nome||'funcionário');
   if(document.getElementById('btnSalvarFuncionario')) btnSalvarFuncionario.innerText='Salvar alterações';
+  renderProdutividadeFuncionario(f);
   if(document.getElementById('funcionarioTitulo')) funcionarioTitulo.scrollIntoView({behavior:'smooth'});
 }
 
