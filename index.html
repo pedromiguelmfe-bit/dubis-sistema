@@ -3481,14 +3481,19 @@ function renderCalendarioFinanceiro(){
 function calFinAbrirDia(diaISO){
   const contasDia = finance.filter(c=>String(c.data||'').slice(0,10)===diaISO).sort((a,b)=>String(a.descricao||'').localeCompare(String(b.descricao||'')));
   const entradasDia = entradas.filter(e=>String(e.data||'').slice(0,10)===diaISO).sort((a,b)=>String(a.descricao||'').localeCompare(String(b.descricao||'')));
+  // saídas avulsas: exclui as que já vieram de uma conta paga, pra não contar duas vezes
+  // (a conta paga já entra no resumo como "Contas pagas").
+  const saidasDia = saidas.filter(s=>s.origem!=='ContaPaga' && String(s.data||'').slice(0,10)===diaISO).sort((a,b)=>String(a.descricao||'').localeCompare(String(b.descricao||'')));
 
   const totalEntradas = entradasDia.reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
-  const totalContas = contasDia.reduce((s,c)=>s+Number(c.valor||0),0);
-  const saldo = totalEntradas - totalContas;
+  const totalContasPagas = contasDia.filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
+  const totalSaidas = saidasDia.reduce((s,x)=>s+Number(x.valor||0),0);
+  const saldo = totalEntradas - totalContasPagas - totalSaidas;
 
   document.getElementById('calFinDiaTitulo').innerText = 'Movimentações de '+dataBR(diaISO);
 
   const linhasEntradas = entradasDia.length ? entradasDia.map(e=>`<tr><td>${escapeHtml(e.descricao||'')}</td><td>${escapeHtml(e.forma||'-')}</td><td>${moeda(e.valorLiquido!=null?e.valorLiquido:e.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma entrada neste dia.</td></tr>';
+  const linhasSaidas = saidasDia.length ? saidasDia.map(s=>`<tr><td>${escapeHtml(s.descricao||'')}</td><td>${escapeHtml(s.categoria||s.formaPagamento||'-')}</td><td>${moeda(s.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma saída neste dia.</td></tr>';
   const linhasContas = contasDia.length ? contasDia.map(c=>{
     const st=statusAutomaticoConta(c);
     const cor = st==='Pago'?'green':st==='Vencido'?'red':st==='Vence hoje'?'orange':st==='Aguardando valor'?'gray':'';
@@ -3498,12 +3503,15 @@ function calFinAbrirDia(diaISO){
   document.getElementById('calFinDiaConteudo').innerHTML = `
     <h4 style="margin-bottom:6px">Entradas</h4>
     <table class="rec-table"><thead><tr><th>Descrição</th><th>Forma</th><th>Valor</th></tr></thead><tbody>${linhasEntradas}</tbody></table>
-    <h4 style="margin:14px 0 6px">Contas a pagar</h4>
+    <h4 style="margin:14px 0 6px">Saídas</h4>
+    <table class="rec-table"><thead><tr><th>Descrição</th><th>Categoria/forma</th><th>Valor</th></tr></thead><tbody>${linhasSaidas}</tbody></table>
+    <h4 style="margin:14px 0 6px">Contas a pagar (pendentes e pagas)</h4>
     <table class="rec-table"><thead><tr><th>Descrição</th><th>Status</th><th>Valor</th></tr></thead><tbody>${linhasContas}</tbody></table>
     <div class="cp-resumo" style="margin-top:14px">
-      <div class="cp-resumo-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="cp-resumo-grid" style="grid-template-columns:repeat(4,1fr)">
         <div><small>Total de entradas</small><div>${moeda(totalEntradas)}</div></div>
-        <div><small>Total de contas</small><div>${moeda(totalContas)}</div></div>
+        <div><small>Total de saídas</small><div>${moeda(totalSaidas)}</div></div>
+        <div><small>Total das contas pagas</small><div>${moeda(totalContasPagas)}</div></div>
         <div><small>Saldo do dia</small><div>${moeda(saldo)}</div></div>
       </div>
     </div>
