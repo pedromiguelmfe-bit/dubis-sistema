@@ -301,14 +301,15 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 <section id="concluidos" class="section">
   <div class="panel">
     <h3>Serviços concluídos</h3>
-    <p class="muted">Pesquise por cliente, placa ou veículo e gere PDF para consultar o histórico.</p>
+    <p class="muted">Mostra só os serviços concluídos deste mês, pra ficar sempre limpa. No fim do mês, eles saem daqui automaticamente — mas continuam salvos pra sempre no Financeiro › Movimentações e Resultados, com PDF disponível a qualquer momento.</p>
     <div class="grid2">
-      <div><label>Buscar serviço concluído</label><input id="buscaConcluidos" placeholder="Nome, placa ou veículo" oninput="pesquisarConcluidos()"></div>
+      <div><label>Buscar serviço concluído (neste mês)</label><input id="buscaConcluidos" placeholder="Nome, placa ou veículo" oninput="pesquisarConcluidos()"></div>
     </div>
     <table>
       <thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Placa</th><th>Valor</th><th>Forma</th><th>Funcionário</th><th>PDF</th></tr></thead>
       <tbody id="listaConcluidos"></tbody>
     </table>
+    <p class="muted" style="margin-top:10px">Procurando um serviço de um mês anterior? <button class="gray" onclick="irParaMovimentacoesFinanceiro()">Ver no Financeiro</button></p>
   </div>
 </section>
 
@@ -1792,16 +1793,28 @@ function pesquisarConcluidos(){
   renderConcluidos();
 }
 
+function verPdfDeMovimentacaoOS(quoteId){
+  const s = servicosConcluidos.find(x=>String(x.quoteId)===String(quoteId));
+  if(!s){ alert('Não foi possível localizar o PDF deste serviço.'); return; }
+  gerarPDFConcluido(s.id);
+}
+function irParaMovimentacoesFinanceiro(){
+  abrirPorId('financeiro');
+  const btn=[...document.querySelectorAll('.finance-tabs button')].find(b=>b.getAttribute('onclick')?.includes("'finMovimentacoes'"));
+  abrirFinanceiro('finMovimentacoes', btn);
+}
 function renderConcluidos(){
   if(!document.getElementById('listaConcluidos'))return;
   listaConcluidos.innerHTML='';
   const termo = normalizarTextoBusca(document.getElementById('buscaConcluidos')?.value || '');
+  const mesAtual = mesAtualISO();
   const lista = servicosConcluidos.filter(s=>{
+    if(String(s.data||'').slice(0,7)!==mesAtual) return false;
     if(!termo) return true;
     return normalizarTextoBusca(s.cliente).includes(termo) || normalizarTextoBusca(s.placa).includes(termo) || normalizarTextoBusca(s.veiculo).includes(termo);
   });
   if(lista.length===0){
-    listaConcluidos.innerHTML='<tr><td colspan="8" class="muted">Nenhum serviço concluído encontrado.</td></tr>';
+    listaConcluidos.innerHTML='<tr><td colspan="8" class="muted">Nenhum serviço concluído neste mês ainda.</td></tr>';
     return;
   }
   lista.forEach(s=>{
@@ -3220,7 +3233,7 @@ function mrLimparFiltroData(){
 }
 function _linhaMovimentacaoHtml(m){
   const corTipo = m.tipo==='Entrada' ? 'green' : 'red';
-  const acao = (m.tipo==='Entrada' && m.osRef) ? `<button onclick="abrirDetalheOS('${m.osRef}')">Ver OS</button>` : '';
+  const acao = (m.tipo==='Entrada' && m.osRef) ? `<button onclick="abrirDetalheOS('${m.osRef}')">Ver OS</button> <button onclick="verPdfDeMovimentacaoOS('${m.osRef}')">PDF</button>` : '';
   return `<tr>
     <td>${dataBR(m.data)}</td>
     <td>${escapeHtml(m.descricao)}</td>
