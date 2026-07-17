@@ -794,16 +794,20 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 
   <div class="panel" id="produtividadeFuncionarioPanel" style="display:none">
     <h3>Produtividade</h3>
-    <p class="muted">Calculado automaticamente a partir dos itens "Lavagem de Veículo" e "Mão de Obra Mecânica" nas Ordens de Serviço concluídas em que este funcionário foi marcado como responsável.</p>
-    <div class="cp-cards" style="grid-template-columns:repeat(3,1fr)">
-      <div class="cp-card c-verde"><small>Total produzido em serviços</small><div class="cp-val" id="pfTotalProduzido">R$ 0,00</div><div class="cp-qtd" id="pfTotalQtd">0 serviços</div></div>
+    <p class="muted">Calculado automaticamente a partir dos itens "Lavagem de Veículo" e "Mão de Obra Mecânica" nas Ordens de Serviço concluídas em que este funcionário foi marcado como responsável. Os indicadores de semana e mês são sempre da semana/mês atual — reiniciam sozinhos, sem precisar zerar nada na mão.</p>
+    <div class="cp-cards" style="grid-template-columns:repeat(2,1fr)">
+      <div class="cp-card c-verde"><small>Total produzido em serviços (geral)</small><div class="cp-val" id="pfTotalProduzido">R$ 0,00</div><div class="cp-qtd" id="pfTotalQtd">0 serviços</div></div>
       <div class="cp-card c-preto"><small>Já recebeu (pagamentos pagos)</small><div class="cp-val" id="pfRecebido">R$ 0,00</div></div>
-      <div class="cp-card c-laranja"><small>Falta receber (pagamentos pendentes)</small><div class="cp-val" id="pfFaltaReceber">R$ 0,00</div></div>
     </div>
-    <div class="cp-cards" style="grid-template-columns:repeat(4,1fr);margin-top:10px">
+    <h4 style="font-size:13px;margin:14px 0 6px;color:#6b7280;text-transform:uppercase">Semana atual</h4>
+    <div class="cp-cards" style="grid-template-columns:repeat(2,1fr)">
       <div class="cp-card c-cinza"><small>Produção da semana</small><div class="cp-val" id="pfSemanaValor">R$ 0,00</div><div class="cp-qtd" id="pfSemanaQtd">0 serviços</div></div>
-      <div class="cp-card c-amar"><small>Falta pro salário semanal</small><div class="cp-val" id="pfSemanaFalta">-</div></div>
+      <div class="cp-card c-amar"><small>Falta pra meta semanal</small><div class="cp-val" id="pfSemanaFalta">-</div></div>
+    </div>
+    <h4 style="font-size:13px;margin:14px 0 6px;color:#6b7280;text-transform:uppercase">Mês atual</h4>
+    <div class="cp-cards" style="grid-template-columns:repeat(3,1fr)">
       <div class="cp-card c-preto"><small>Produção do mês</small><div class="cp-val" id="pfMesValor">R$ 0,00</div><div class="cp-qtd" id="pfMesQtd">0 serviços</div></div>
+      <div class="cp-card c-laranja"><small>Falta pra meta mensal</small><div class="cp-val" id="pfMesFalta">-</div></div>
       <div class="cp-card c-cinza"><small>Ticket médio (mês)</small><div class="cp-val" id="pfTicketMedio">R$ 0,00</div></div>
     </div>
     <div style="margin-top:14px">
@@ -1327,12 +1331,10 @@ function renderProdutividadeFuncionario(f){
   const ticketMedio = mes.qtd>0 ? mes.valor/mes.qtd : 0;
   const totalGeral=_producaoTotalFuncionario(f.id);
   const recebido=_recebidoFuncionario(f.id);
-  const faltaReceber=_faltaReceberFuncionario(f.id);
 
   document.getElementById('pfTotalProduzido').innerText=moeda(totalGeral.valor);
   document.getElementById('pfTotalQtd').innerText=totalGeral.qtd+(totalGeral.qtd===1?' serviço':' serviços');
   document.getElementById('pfRecebido').innerText=moeda(recebido);
-  document.getElementById('pfFaltaReceber').innerText=moeda(faltaReceber);
 
   document.getElementById('pfSemanaValor').innerText=moeda(semana.valor);
   document.getElementById('pfSemanaQtd').innerText=semana.qtd+(semana.qtd===1?' serviço':' serviços');
@@ -1343,9 +1345,17 @@ function renderProdutividadeFuncionario(f){
   const metaSemanal=Number(f.valorSemanal||0);
   if(metaSemanal>0){
     const falta=Math.max(0, metaSemanal-semana.valor);
-    document.getElementById('pfSemanaFalta').innerText = falta>0 ? moeda(falta) : 'Salário batido ✓';
+    document.getElementById('pfSemanaFalta').innerText = falta>0 ? moeda(falta) : 'Meta batida ✓';
   } else {
     document.getElementById('pfSemanaFalta').innerText='Sem meta semanal cadastrada';
+  }
+
+  const metaMensal=Number(f.salarioMensal||0);
+  if(metaMensal>0){
+    const faltaMes=Math.max(0, metaMensal-mes.valor);
+    document.getElementById('pfMesFalta').innerText = faltaMes>0 ? moeda(faltaMes) : 'Meta batida ✓';
+  } else {
+    document.getElementById('pfMesFalta').innerText='Sem meta mensal cadastrada';
   }
 
   // histórico das últimas 6 semanas
@@ -2417,13 +2427,18 @@ function renderFuncionarios(){
     const auto = (f.geraSemanal!==false && Number(f.valorSemanal||0)>0)
       ? `<span class="badge green">Pgto semanal: ${moeda(f.valorSemanal)}</span>`
       : '<span class="badge" style="background:#e5e7eb;color:#374151">Sem pgto semanal automático</span>';
-    const producao=_producaoTotalFuncionario(f.id);
+    const producaoTotal=_producaoTotalFuncionario(f.id);
     const recebido=_recebidoFuncionario(f.id);
-    const falta=_faltaReceberFuncionario(f.id);
+    const hoje=new Date();
+    const inicioSemana=_inicioSemanaISO(hoje);
+    const fimSemana=_fimSemanaISO(inicioSemana);
+    const semana=_producaoFuncionarioPeriodo(f.id, inicioSemana, fimSemana);
+    const metaSemanal=Number(f.valorSemanal||0);
+    const faltaSemanaTxt = metaSemanal>0 ? (semana.valor>=metaSemanal ? 'Meta batida ✓' : moeda(metaSemanal-semana.valor)) : '-';
     return `<div class="client-card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><strong>${escapeHtml(f.nome)}</strong> ${auto}</div>
       <small>Cargo: ${escapeHtml(f.cargo||'-')} | Tel: ${escapeHtml(f.telefone||'-')} | Admissão: ${f.admissao?dataBR(f.admissao):'-'} | Salário: ${f.salarioMensal?moeda(f.salarioMensal):'-'}</small><br>
-      <small style="display:block;margin-top:4px"><strong>Produziu:</strong> ${moeda(producao.valor)} (${producao.qtd} ${producao.qtd===1?'serviço':'serviços'}) &nbsp;·&nbsp; <strong>Recebeu:</strong> ${moeda(recebido)} &nbsp;·&nbsp; <strong>Falta receber:</strong> ${moeda(falta)}</small>
+      <small style="display:block;margin-top:4px"><strong>Produção da semana:</strong> ${moeda(semana.valor)} (${semana.qtd} ${semana.qtd===1?'serviço':'serviços'}) &nbsp;·&nbsp; <strong>Falta pra meta semanal:</strong> ${faltaSemanaTxt} &nbsp;·&nbsp; <strong>Produzido no total:</strong> ${moeda(producaoTotal.valor)} &nbsp;·&nbsp; <strong>Recebeu:</strong> ${moeda(recebido)}</small>
       <div class="actions">
         <button onclick="editarFuncionario('${f.id}')">Abrir / Editar</button>
         <button onclick="historicoFuncionario('${f.id}')">Histórico</button>
