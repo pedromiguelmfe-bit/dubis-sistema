@@ -1835,6 +1835,7 @@ function renderQuotes(){
         <button class="gray" onclick="editarOrcamento(${q.id})">Editar</button>
         <button class="green" onclick="aprovarOrcamento(${q.id})">Aprovar / virar OS</button>
         <button class="dark" onclick="gerarPDF(${q.id})">Gerar PDF</button>
+        <button class="gray" onclick="gerarPDFMecanico(${q.id})">PDF para o mecânico</button>
         <button class="red" onclick="excluirOrcamento(${q.id})">Apagar</button>
       </div>
     </div>`;
@@ -2586,6 +2587,96 @@ function gerarPDF(id){
     </div>
 
       <div class="line">Dubis Serviços Automotivos</div>
+    </div>
+  </div>
+  <script>window.onload=function(){window.print()}<\/script></body></html>`;
+
+  const w=window.open('','_blank'); w.document.write(pdf); w.document.close();
+}
+
+function gerarPDFMecanico(id){
+  const q=quotes.find(x=>x.id===id); if(!q)return;
+
+  const itens=q.items.map((it, idx)=>`
+    <tr>
+      <td class="num">${idx+1}</td>
+      <td class="desc">${escapeHtml(it.desc)}</td>
+      <td class="qtd">${escapeHtml(it.qtd)}</td>
+    </tr>
+  `).join('');
+
+  const linhasVazias = Array.from({length: Math.max(0, 10 - q.items.length)}).map(()=>`
+    <tr><td class="num">&nbsp;</td><td class="desc"></td><td class="qtd"></td></tr>
+  `).join('');
+
+  const pdf=`<html><head><title>Ordem de Serviço #${q.number} - Mecânico</title>
+  <style>
+    @page{ size:auto; margin:0; }
+    *{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#e5e7eb;color:#111827}
+    .page{width:794px;min-height:1123px;margin:0 auto;background:white;padding:28px;position:relative}
+    .header{display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid #111827;padding-bottom:14px}
+    .brand h1{font-size:24px;margin:0;color:#111827;letter-spacing:.5px}
+    .brand p{font-size:12px;margin:4px 0;color:#4b5563}
+    .logo{max-width:210px;max-height:82px;background:#050505;border-radius:8px;padding:6px;object-fit:contain}
+    .title{margin-top:18px;background:#111827;color:white;padding:11px 14px;border-radius:10px;display:flex;justify-content:space-between;align-items:center}
+    .title h2{font-size:18px;margin:0}
+    .title span{font-size:13px}
+    .info{display:grid;grid-template-columns:1.2fr .8fr 1fr;gap:10px;margin-top:14px}
+    .box{border:1px solid #d1d5db;border-radius:10px;padding:10px;background:#f9fafb;min-height:58px}
+    .label{font-size:10px;text-transform:uppercase;color:#6b7280;font-weight:900;margin-bottom:5px}
+    .value{font-size:14px;font-weight:800}
+    table{width:100%;border-collapse:collapse;margin-top:18px}
+    th{background:#111827;color:white;text-align:left;font-size:12px;padding:9px;border:1px solid #111827}
+    td{font-size:13px;padding:10px;border:1px solid #d1d5db;height:32px}
+    .num{width:40px;text-align:center;color:#6b7280}
+    .desc{text-align:left}
+    .qtd{width:90px;text-align:center}
+    .avisoInterno{margin-top:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:12px;color:#92400e}
+    .assinatura{margin-top:50px;display:flex;justify-content:space-between;gap:30px}
+    .assinatura div{flex:1;border-top:1px solid #111827;text-align:center;padding-top:6px;font-size:11px;color:#4b5563}
+    @media print{
+      body{background:white}
+      .page{width:100%;min-height:auto;padding:20px}
+    }
+  </style></head><body>
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <h1>DUBIS SERVIÇOS AUTOMOTIVOS</h1>
+        <p>Mecânica • Elétrica • Diagnóstico • Manutenção preventiva</p>
+        <p>Documento interno de uso do mecânico — sem valores</p>
+      </div>
+      ${LOGO_SRC?`<img class="logo" src="${LOGO_SRC}">`:''}
+    </div>
+
+    <div class="title">
+      <h2>ORDEM DE SERVIÇO #${q.number}</h2>
+      <span>Data: ${dataBR(q.createdAt)}</span>
+    </div>
+
+    <div class="info">
+      <div class="box"><div class="label">Cliente</div><div class="value">${escapeHtml(q.cliente)}</div></div>
+      <div class="box"><div class="label">Placa</div><div class="value">${escapeHtml(q.placa||'-')}</div></div>
+      <div class="box"><div class="label">Veículo</div><div class="value">${escapeHtml(q.veiculo||'-')}${q.km?' — '+escapeHtml(q.km):''}</div></div>
+    </div>
+
+    ${q.obs?`<div class="avisoInterno"><strong>Observações:</strong> ${escapeHtml(q.obs)}</div>`:''}
+
+    <table>
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>Serviço / peça a executar</th>
+          <th class="qtd">Qtd</th>
+        </tr>
+      </thead>
+      <tbody>${itens}${linhasVazias}</tbody>
+    </table>
+
+    <div class="assinatura">
+      <div>Mecânico responsável</div>
+      <div>Data de execução</div>
     </div>
   </div>
   <script>window.onload=function(){window.print()}<\/script></body></html>`;
