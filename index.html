@@ -125,6 +125,17 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 .valor-wrap span{font-weight:800;color:#111827}
 .valor-wrap input{min-width:105px}
 @media(max-width:950px){aside{position:relative;width:100%}main{margin-left:0}.cards,.grid,.grid2,.item-row{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.rec-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:950px){
+  .table-scroll table{min-width:640px}
+  .item-head{display:none}
+  .cp-modal{padding:16px;border-radius:10px}
+  .cp-modal.wide{max-width:100%}
+  .actions button, .item-row button, table button{padding:8px 12px;font-size:13px}
+  .finance-tabs{gap:6px}
+  .finance-tabs button{padding:8px 10px;font-size:13px}
+}
 .cp-modal-overlay{display:none;position:fixed;inset:0;background:rgba(17,24,39,.5);z-index:9998;align-items:center;justify-content:center;padding:20px}
 .cp-modal-overlay.aberto{display:flex}
 .cp-modal{background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
@@ -931,10 +942,13 @@ async function carregarDadosSalvos(){
   let usar=null, precisaReenviar=false;
   if(localBkp && localBkp.dados && localBkp.ts > supaTs + 2000){
     usar = localBkp.dados; precisaReenviar=true; // local é mais novo => recupera e reenvia
+    window._ultimoTsConhecido = localBkp.ts;
   } else if(supaDados){
     usar = supaDados;
+    window._ultimoTsConhecido = supaTs;
   } else if(localBkp && localBkp.dados){
     usar = localBkp.dados;
+    window._ultimoTsConhecido = localBkp.ts||0;
   }
 
   if(usar){
@@ -996,15 +1010,35 @@ async function salvarAgora(){
   return await enviarParaSupabase();
 }
 
+window._ultimoTsConhecido = 0;
 async function enviarParaSupabase(){
   const ts=Date.now();
   const dados=_coletarDados();
   _salvarBackupLocal(dados, ts);
+
+  // Proteção contra sobrescrita silenciosa: confere se outro computador/celular já
+  // salvou algo mais novo desde a última vez que esta tela conferiu o servidor.
+  // Se sim, NÃO grava por cima — recarrega a página com os dados mais atuais.
+  try{
+    const { data: check, error: errCheck } = await sb.from('estado_sistema')
+      .select('atualizado_em').eq('id', ESTADO_ID).maybeSingle();
+    if(!errCheck && check && check.atualizado_em){
+      const remotoTs = Date.parse(check.atualizado_em)||0;
+      if(remotoTs > window._ultimoTsConhecido + 1500){
+        mostrarStatus('err');
+        alert('Outro computador ou celular salvou informações mais recentes enquanto esta tela estava aberta. Para não perder nada, a página vai recarregar agora com os dados mais atuais — por favor, refaça a última ação.');
+        window.location.reload();
+        return false;
+      }
+    }
+  }catch(e){ /* se a checagem falhar (ex: sem internet por um instante), segue com o salvamento normal */ }
+
   try{
     const { error } = await sb.from('estado_sistema')
       .upsert({ id: ESTADO_ID, dados, atualizado_em: new Date(ts).toISOString() });
     if(error) throw error;
     _temPendencia=false;
+    window._ultimoTsConhecido = ts;
     mostrarStatus('ok');
     return true;
   }catch(e){
@@ -1084,11 +1118,21 @@ async function sair(){
 async function iniciarApp(){
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='block';
+  envolverTabelasComScroll();
   await carregarDadosSalvos();
   if(gerarHorizontePagamentosSemanais(12)) salvarDados();
   if(gerarHorizonteRecorrentes(12)) salvarDados();
   if(seedItensProdutividade()) salvarDados();
   renderTudo();
+}
+function envolverTabelasComScroll(){
+  document.querySelectorAll('table').forEach(t=>{
+    if(t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+    const wrap=document.createElement('div');
+    wrap.className='table-scroll';
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  });
 }
 function renderTudo(){
   limparOrcamentosAntigos();
