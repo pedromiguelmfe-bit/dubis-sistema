@@ -1769,7 +1769,7 @@ function renderClientes(){
   }).join('');
 }
 
-function finalizarOrcamento(){
+async function finalizarOrcamento(){
   if(!qCliente.value){alert('Informe o nome do cliente.');return}
   if(currentItems.length===0){alert('Adicione pelo menos um item.');return}
   const subtotal=totalItens(currentItems);
@@ -1789,7 +1789,11 @@ function finalizarOrcamento(){
       os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.km=data.km; os.obs=data.obs; os.clientId=data.clientId; os.items=JSON.parse(JSON.stringify(data.items)); os.subtotal=data.subtotal; os.desconto=data.desconto; os.total=data.total;
     }
   }
-  formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard(); salvarAgora();
+  formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard();
+  const ok = await salvarAgora();
+  if(!ok){
+    alert('ATENÇÃO: este orçamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente salvar novamente.');
+  }
 }
 
 function editarOrcamento(id){
@@ -1824,7 +1828,7 @@ function renderQuotes(){
   });
 }
 function excluirOrcamento(id){if(!confirm('Tem certeza de que deseja excluir este registro? Esta ação não poderá ser desfeita.'))return;quotes=quotes.filter(q=>q.id!==id);renderQuotes();atualizarDashboard();salvarAgora()}
-function aprovarOrcamento(id){
+async function aprovarOrcamento(id){
   const q=quotes.find(x=>x.id===id); if(!q)return;
   q.status='OS';
   if(!serviceOrders.find(o=>o.quoteId===id)){
@@ -1846,7 +1850,11 @@ function aprovarOrcamento(id){
       createdAt:q.createdAt
     });
   }
-  renderQuotes(); renderOS(); atualizarDashboard(); salvarAgora();
+  renderQuotes(); renderOS(); atualizarDashboard();
+  const ok = await salvarAgora();
+  if(!ok){
+    alert('ATENÇÃO: a aprovação desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente aprovar novamente.');
+  }
 }
 function _totalPagoOS(os){
   return (os.pagamentos||[]).reduce((s,p)=>s+Number(p.valor||0),0);
@@ -1902,7 +1910,7 @@ function abrirLancarPagamentoOS(i){
   modalPagamentoOSOverlay.classList.add('aberto');
 }
 function fecharModalPagamentoOS(){ modalPagamentoOSOverlay.classList.remove('aberto'); }
-function confirmarPagamentoOS(){
+async function confirmarPagamentoOS(){
   const i=window.__osPagamentoIndex;
   const os=serviceOrders[i]; if(!os)return;
   const valor=Number(document.getElementById('opValor').value||0);
@@ -1933,11 +1941,15 @@ function confirmarPagamentoOS(){
 
   if(totalPago >= Number(os.total||0) - 0.009){
     if(confirm('Este pagamento quita o valor total da OS. Ela será movida para Serviços Concluídos. Confirmar?')){
-      _finalizarOS(i);
+      await _finalizarOS(i);
       return;
     }
   }
-  renderOS(); renderEntradas(); atualizarDashboard(); salvarAgora();
+  renderOS(); renderEntradas(); atualizarDashboard();
+  const ok = await salvarAgora();
+  if(!ok){
+    alert('ATENÇÃO: este pagamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador nem atualize a página agora — verifique sua internet e tente lançar o pagamento novamente em alguns segundos.');
+  }
 }
 function excluirPagamentoOS(i, pagamentoId){
   const os=serviceOrders[i]; if(!os)return;
@@ -1949,7 +1961,7 @@ function excluirPagamentoOS(i, pagamentoId){
   os.pagamentos = (os.pagamentos||[]).filter(p=>String(p.id)!==String(pagamentoId));
   renderOS(); renderEntradas(); atualizarDashboard(); salvarAgora();
 }
-function _finalizarOS(i){
+async function _finalizarOS(i){
   const o=serviceOrders[i]; if(!o)return;
   const func = funcionarios.find(f=>String(f.id)===String(o.funcionarioId));
   const formasUsadas = [...new Set((o.pagamentos||[]).map(p=>p.forma))];
@@ -1989,7 +2001,10 @@ function _finalizarOS(i){
   renderConcluidos();
   renderEstoque();
   atualizarDashboard();
-  salvarAgora();
+  const ok = await salvarAgora();
+  if(!ok){
+    alert('ATENÇÃO: a conclusão desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Os dados ainda estão na sua tela — não feche o navegador. Verifique sua internet e tente novamente em alguns segundos: use o botão "Reabrir p/ OS" em Serviços Concluídos e refaça o pagamento, ou aguarde a reconexão automática.');
+  }
 }
 
 function editarOrdemServico(i){
@@ -2079,7 +2094,7 @@ function _reverterServicoConcluido(id){
   servicosConcluidos.splice(idx,1);
   return s;
 }
-function reabrirParaOS(id){
+async function reabrirParaOS(id){
   const s = servicosConcluidos.find(x=>x.id===id); if(!s)return;
   if(!confirm(`Reabrir esta Ordem de Serviço?
 
@@ -2113,10 +2128,11 @@ Esta ação não pode ser desfeita automaticamente.`)) return;
     createdAt: removido.data
   });
 
-  renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard(); salvarAgora();
-  alert("Ordem de Serviço reaberta. Ela está novamente em Ordens de serviço aprovadas.");
+  renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard();
+  const ok = await salvarAgora();
+  alert(ok ? "Ordem de Serviço reaberta. Ela está novamente em Ordens de serviço aprovadas." : "ATENÇÃO: a reabertura NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.");
 }
-function reabrirParaOrcamento(id){
+async function reabrirParaOrcamento(id){
   const s = servicosConcluidos.find(x=>x.id===id); if(!s)return;
   if(!confirm(`Voltar este serviço para a etapa de orçamento?
 
@@ -2132,8 +2148,9 @@ Esta ação não pode ser desfeita automaticamente.`)) return;
   const q = quotes.find(x=>x.id===removido.quoteId);
   if(q) q.status="Aberto";
 
-  renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard(); salvarAgora();
-  alert("Serviço devolvido para a lista de orçamentos em aberto.");
+  renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard();
+  const ok = await salvarAgora();
+  alert(ok ? "Serviço devolvido para a lista de orçamentos em aberto." : "ATENÇÃO: essa mudança NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.");
 }
 
 function gerarPDFConcluido(id){
