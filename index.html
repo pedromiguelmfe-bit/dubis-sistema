@@ -1015,24 +1015,6 @@ async function enviarParaSupabase(){
   const ts=Date.now();
   const dados=_coletarDados();
   _salvarBackupLocal(dados, ts);
-
-  // Proteção contra sobrescrita silenciosa: confere se outro computador/celular já
-  // salvou algo mais novo desde a última vez que esta tela conferiu o servidor.
-  // Se sim, NÃO grava por cima — recarrega a página com os dados mais atuais.
-  try{
-    const { data: check, error: errCheck } = await sb.from('estado_sistema')
-      .select('atualizado_em').eq('id', ESTADO_ID).maybeSingle();
-    if(!errCheck && check && check.atualizado_em){
-      const remotoTs = Date.parse(check.atualizado_em)||0;
-      if(remotoTs > window._ultimoTsConhecido + 1500){
-        mostrarStatus('err');
-        alert('Outro computador ou celular salvou informações mais recentes enquanto esta tela estava aberta. Para não perder nada, a página vai recarregar agora com os dados mais atuais — por favor, refaça a última ação.');
-        window.location.reload();
-        return false;
-      }
-    }
-  }catch(e){ /* se a checagem falhar (ex: sem internet por um instante), segue com o salvamento normal */ }
-
   try{
     const { error } = await sb.from('estado_sistema')
       .upsert({ id: ESTADO_ID, dados, atualizado_em: new Date(ts).toISOString() });
