@@ -1106,6 +1106,66 @@ async function iniciarApp(){
   if(gerarHorizonteRecorrentes(12)) salvarDados();
   if(seedItensProdutividade()) salvarDados();
   renderTudo();
+  iniciarSincronizacaoTempoReal();
+}
+/* ===== Sincronização em tempo real entre dispositivos =====
+   Quando outro computador/celular salva algo, este aviso avisa na hora,
+   sem nunca apagar o que está sendo digitado nesta tela. */
+function iniciarSincronizacaoTempoReal(){
+  try{
+    sb.channel('estado_sistema_mudancas_'+Date.now())
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'estado_sistema', filter:`id=eq.${ESTADO_ID}` }, (payload)=>{
+        const novoTs = Date.parse(payload.new.atualizado_em)||0;
+        if(novoTs <= (window._ultimoTsConhecido||0) + 1000) return; // é a própria gravação desta tela
+
+        if(_temPendencia){
+          // esta tela tem algo não salvo ainda: não sobrescreve, só avisa
+          mostrarAvisoOutroDispositivo();
+          return;
+        }
+        if(document.activeElement && ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)){
+          // usuário está digitando algo agora: não interrompe, só avisa
+          mostrarAvisoOutroDispositivo();
+          return;
+        }
+        // seguro atualizar sozinho: aplica os dados novos e re-renderiza a tela
+        aplicarDadosRemotos(payload.new.dados, novoTs);
+      })
+      .subscribe();
+  }catch(e){
+    console.error('Não foi possível iniciar a sincronização em tempo real:', e);
+  }
+}
+function aplicarDadosRemotos(dadosNovos, ts){
+  if(!dadosNovos) return;
+  if(dadosNovos.quotes) quotes = dadosNovos.quotes;
+  if(dadosNovos.serviceOrders) serviceOrders = dadosNovos.serviceOrders;
+  if(dadosNovos.clients) clients = dadosNovos.clients;
+  if(dadosNovos.finance) finance = dadosNovos.finance;
+  if(dadosNovos.recorrentes) recorrentes = dadosNovos.recorrentes;
+  if(dadosNovos.estoque) estoque = dadosNovos.estoque;
+  if(dadosNovos.funcionarios) funcionarios = dadosNovos.funcionarios;
+  if(dadosNovos.servicosConcluidos) servicosConcluidos = dadosNovos.servicosConcluidos;
+  if(dadosNovos.entradas) entradas = dadosNovos.entradas;
+  if(dadosNovos.saidas) saidas = dadosNovos.saidas;
+  window._ultimoTsConhecido = ts;
+  renderTudo();
+  esconderAvisoOutroDispositivo();
+  mostrarStatus('ok');
+}
+function mostrarAvisoOutroDispositivo(){
+  let el=document.getElementById('avisoOutroDispositivo');
+  if(!el){
+    el=document.createElement('div');
+    el.id='avisoOutroDispositivo';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#111827;text-align:center;padding:10px;font-weight:800;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+    el.innerHTML='Outro computador ou celular salvou informações novas. Termine e salve o que você está fazendo agora, depois clique aqui ou atualize a página (F5) para ver as novidades. <button style="margin-left:10px;padding:4px 10px;border-radius:6px;border:none;background:#111827;color:#fff;font-weight:800;cursor:pointer" onclick="window.location.reload()">Atualizar agora</button>';
+    document.body.appendChild(el);
+  }
+}
+function esconderAvisoOutroDispositivo(){
+  const el=document.getElementById('avisoOutroDispositivo');
+  if(el) el.remove();
 }
 function envolverTabelasComScroll(){
   document.querySelectorAll('table').forEach(t=>{
