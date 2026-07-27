@@ -1783,27 +1783,32 @@ function renderClientes(){
 async function finalizarOrcamento(){
   if(!qCliente.value){alert('Informe o nome do cliente.');return}
   if(currentItems.length===0){alert('Adicione pelo menos um item.');return}
-  const subtotal=totalItens(currentItems);
-  const desconto=Number(qDesconto.value||0);
-  const total=Math.max(0, subtotal-desconto);
-  const data={cliente:qCliente.value, placa:qPlaca.value, veiculo:qVeiculo.value, km:qKm.value.trim(), obs:qObs.value.trim(), items:JSON.parse(JSON.stringify(currentItems)), subtotal:subtotal, desconto:desconto, total:total};
-  data.clientId = salvarClienteBasicoDoOrcamento(data);
-  if(editingQuoteId){
-    const q=quotes.find(x=>x.id===editingQuoteId);
-    if(q) Object.assign(q,data);
-  } else {
-    quotes.push({id:Date.now(), number:String(quotes.length+1).padStart(4,'0'), createdAt:new Date().toISOString().slice(0,10), status:'Aberto', ...data});
-  }
-  if(editingQuoteId){
-    const os = serviceOrders.find(o=>o.quoteId===editingQuoteId);
-    if(os){
-      os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.km=data.km; os.obs=data.obs; os.clientId=data.clientId; os.items=JSON.parse(JSON.stringify(data.items)); os.subtotal=data.subtotal; os.desconto=data.desconto; os.total=data.total;
+  try{
+    const subtotal=totalItens(currentItems);
+    const desconto=Number(qDesconto.value||0);
+    const total=Math.max(0, subtotal-desconto);
+    const data={cliente:qCliente.value, placa:qPlaca.value, veiculo:qVeiculo.value, km:qKm.value.trim(), obs:qObs.value.trim(), items:JSON.parse(JSON.stringify(currentItems)), subtotal:subtotal, desconto:desconto, total:total};
+    data.clientId = salvarClienteBasicoDoOrcamento(data);
+    if(editingQuoteId){
+      const q=quotes.find(x=>x.id===editingQuoteId);
+      if(q) Object.assign(q,data);
+    } else {
+      quotes.push({id:Date.now(), number:String(quotes.length+1).padStart(4,'0'), createdAt:new Date().toISOString().slice(0,10), status:'Aberto', ...data});
     }
-  }
-  formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard();
-  const ok = await salvarAgora();
-  if(!ok){
-    alert('ATENÇÃO: este orçamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente salvar novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    if(editingQuoteId){
+      const os = serviceOrders.find(o=>o.quoteId===editingQuoteId);
+      if(os){
+        os.cliente=data.cliente; os.placa=data.placa; os.veiculo=data.veiculo; os.km=data.km; os.obs=data.obs; os.clientId=data.clientId; os.items=JSON.parse(JSON.stringify(data.items)); os.subtotal=data.subtotal; os.desconto=data.desconto; os.total=data.total;
+      }
+    }
+    formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: este orçamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente salvar novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    }
+  }catch(e){
+    console.error('Erro ao salvar orçamento:', e);
+    alert('ERRO ao salvar este orçamento — NÃO foi concluído.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
   }
 }
 
@@ -1840,31 +1845,36 @@ function renderQuotes(){
 }
 function excluirOrcamento(id){if(!confirm('Tem certeza de que deseja excluir este registro? Esta ação não poderá ser desfeita.'))return;quotes=quotes.filter(q=>q.id!==id);renderQuotes();atualizarDashboard();salvarAgora()}
 async function aprovarOrcamento(id){
-  const q=quotes.find(x=>x.id===id); if(!q)return;
-  q.status='OS';
-  if(!serviceOrders.find(o=>o.quoteId===id)){
-    serviceOrders.push({
-      quoteId:id,
-      cliente:q.cliente,
-      veiculo:q.veiculo,
-      placa:q.placa,
-      km:q.km||'',
-      obs:q.obs||'',
-      clientId:q.clientId||null,
-      subtotal:q.subtotal!=null?q.subtotal:q.total,
-      desconto:q.desconto||0,
-      total:q.total,
-      status:'Aprovado',
-      items:JSON.parse(JSON.stringify(q.items||[])),
-      funcionarioId:'',
-      pagamentos:[],
-      createdAt:q.createdAt
-    });
-  }
-  renderQuotes(); renderOS(); atualizarDashboard();
-  const ok = await salvarAgora();
-  if(!ok){
-    alert('ATENÇÃO: a aprovação desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente aprovar novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+  try{
+    const q=quotes.find(x=>x.id===id); if(!q)return;
+    q.status='OS';
+    if(!serviceOrders.find(o=>o.quoteId===id)){
+      serviceOrders.push({
+        quoteId:id,
+        cliente:q.cliente,
+        veiculo:q.veiculo,
+        placa:q.placa,
+        km:q.km||'',
+        obs:q.obs||'',
+        clientId:q.clientId||null,
+        subtotal:q.subtotal!=null?q.subtotal:q.total,
+        desconto:q.desconto||0,
+        total:q.total,
+        status:'Aprovado',
+        items:JSON.parse(JSON.stringify(q.items||[])),
+        funcionarioId:'',
+        pagamentos:[],
+        createdAt:q.createdAt
+      });
+    }
+    renderQuotes(); renderOS(); atualizarDashboard();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: a aprovação desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente aprovar novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    }
+  }catch(e){
+    console.error('Erro ao aprovar orçamento:', e);
+    alert('ERRO ao aprovar este orçamento — a aprovação NÃO foi concluída nem salva.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
   }
 }
 function _totalPagoOS(os){
@@ -1931,35 +1941,40 @@ async function confirmarPagamentoOS(){
   if(valor<=0){alert('Informe o valor recebido.');return}
   if(!data){alert('Informe a data do pagamento.');return}
 
-  if(!os.pagamentos) os.pagamentos=[];
-  const pagamentoId = Date.now()+Math.floor(Math.random()*100000);
-  const entradaId = pagamentoId+1;
-  os.pagamentos.push({id:pagamentoId, valor, data, forma, obs, entradaId});
+  try{
+    if(!os.pagamentos) os.pagamentos=[];
+    const pagamentoId = Date.now()+Math.floor(Math.random()*100000);
+    const entradaId = pagamentoId+1;
+    os.pagamentos.push({id:pagamentoId, valor, data, forma, obs, entradaId});
 
-  // lança a entrada financeira exatamente na data do recebimento, sem duplicar
-  entradas.push({
-    id:entradaId,
-    data:data,
-    descricao:'OS - '+os.cliente+' - '+(os.veiculo||'')+' '+(os.placa||''),
-    valor:valor,
-    forma:forma.toUpperCase(),
-    origem:'Ordem de Serviço',
-    osRef:os.quoteId
-  });
+    // lança a entrada financeira exatamente na data do recebimento, sem duplicar
+    entradas.push({
+      id:entradaId,
+      data:data,
+      descricao:'OS - '+os.cliente+' - '+(os.veiculo||'')+' '+(os.placa||''),
+      valor:valor,
+      forma:forma.toUpperCase(),
+      origem:'Ordem de Serviço',
+      osRef:os.quoteId
+    });
 
-  const totalPago=_totalPagoOS(os);
-  fecharModalPagamentoOS();
+    const totalPago=_totalPagoOS(os);
+    fecharModalPagamentoOS();
 
-  if(totalPago >= Number(os.total||0) - 0.009){
-    if(confirm('Este pagamento quita o valor total da OS. Ela será movida para Serviços Concluídos. Confirmar?')){
-      await _finalizarOS(i);
-      return;
+    if(totalPago >= Number(os.total||0) - 0.009){
+      if(confirm('Este pagamento quita o valor total da OS. Ela será movida para Serviços Concluídos. Confirmar?')){
+        await _finalizarOS(i);
+        return;
+      }
     }
-  }
-  renderOS(); renderEntradas(); atualizarDashboard();
-  const ok = await salvarAgora();
-  if(!ok){
-    alert('ATENÇÃO: este pagamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador nem atualize a página agora — verifique sua internet e tente lançar o pagamento novamente em alguns segundos.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    renderOS(); renderEntradas(); atualizarDashboard();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: este pagamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador nem atualize a página agora — verifique sua internet e tente lançar o pagamento novamente em alguns segundos.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    }
+  }catch(e){
+    console.error('Erro ao lançar pagamento:', e);
+    alert('ERRO ao lançar este pagamento — NÃO foi concluído nem salvo.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
   }
 }
 function excluirPagamentoOS(i, pagamentoId){
@@ -1974,47 +1989,52 @@ function excluirPagamentoOS(i, pagamentoId){
 }
 async function _finalizarOS(i){
   const o=serviceOrders[i]; if(!o)return;
-  const func = funcionarios.find(f=>String(f.id)===String(o.funcionarioId));
-  const formasUsadas = [...new Set((o.pagamentos||[]).map(p=>p.forma))];
-  servicosConcluidos.push({
-    id:Date.now()+1,
-    quoteId:o.quoteId,
-    data:dataHojeISO(),
-    cliente:o.cliente,
-    veiculo:o.veiculo,
-    placa:o.placa,
-    km:o.km||'',
-    obs:o.obs||'',
-    clientId:o.clientId||null,
-    subtotal:o.subtotal!=null?o.subtotal:o.total,
-    desconto:o.desconto||0,
-    total:o.total,
-    forma: formasUsadas.length===1 ? formasUsadas[0] : 'Múltiplas formas',
-    funcionario: func ? func.nome : '',
-    items:JSON.parse(JSON.stringify(o.items||[])),
-    pagamentos:JSON.parse(JSON.stringify(o.pagamentos||[]))
-  });
+  try{
+    const func = funcionarios.find(f=>String(f.id)===String(o.funcionarioId));
+    const formasUsadas = [...new Set((o.pagamentos||[]).map(p=>p.forma))];
+    servicosConcluidos.push({
+      id:Date.now()+1,
+      quoteId:o.quoteId,
+      data:dataHojeISO(),
+      cliente:o.cliente,
+      veiculo:o.veiculo,
+      placa:o.placa,
+      km:o.km||'',
+      obs:o.obs||'',
+      clientId:o.clientId||null,
+      subtotal:o.subtotal!=null?o.subtotal:o.total,
+      desconto:o.desconto||0,
+      total:o.total,
+      forma: formasUsadas.length===1 ? formasUsadas[0] : 'Múltiplas formas',
+      funcionario: func ? func.nome : '',
+      items:JSON.parse(JSON.stringify(o.items||[])),
+      pagamentos:JSON.parse(JSON.stringify(o.pagamentos||[]))
+    });
 
-  const q = quotes.find(x=>x.id===o.quoteId);
-  if(q) q.status='Concluído';
+    const q = quotes.find(x=>x.id===o.quoteId);
+    if(q) q.status='Concluído';
 
-  // baixa automática no estoque das peças usadas nesta OS
-  (o.items||[]).forEach(it=>{
-    if(!it.estoqueId)return;
-    const pe=estoque.find(x=>String(x.id)===String(it.estoqueId));
-    if(pe && pe.tipo==='Peça'){ pe.quantidade=Math.max(0, Number(pe.quantidade||0)-Number(it.qtd||0)); }
-  });
+    // baixa automática no estoque das peças usadas nesta OS
+    (o.items||[]).forEach(it=>{
+      if(!it.estoqueId)return;
+      const pe=estoque.find(x=>String(x.id)===String(it.estoqueId));
+      if(pe && pe.tipo==='Peça'){ pe.quantidade=Math.max(0, Number(pe.quantidade||0)-Number(it.qtd||0)); }
+    });
 
-  serviceOrders.splice(i,1);
-  renderEntradas();
-  renderOS();
-  renderQuotes();
-  renderConcluidos();
-  renderEstoque();
-  atualizarDashboard();
-  const ok = await salvarAgora();
-  if(!ok){
-    alert('ATENÇÃO: a conclusão desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Os dados ainda estão na sua tela — não feche o navegador. Verifique sua internet e tente novamente em alguns segundos: use o botão "Reabrir p/ OS" em Serviços Concluídos e refaça o pagamento, ou aguarde a reconexão automática.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    serviceOrders.splice(i,1);
+    renderEntradas();
+    renderOS();
+    renderQuotes();
+    renderConcluidos();
+    renderEstoque();
+    atualizarDashboard();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: a conclusão desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Os dados ainda estão na sua tela — não feche o navegador. Verifique sua internet e tente novamente em alguns segundos: use o botão "Reabrir p/ OS" em Serviços Concluídos e refaça o pagamento, ou aguarde a reconexão automática.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    }
+  }catch(e){
+    console.error('Erro ao concluir OS:', e);
+    alert('ERRO ao concluir esta Ordem de Serviço — NÃO foi movida nem salva.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
   }
 }
 
@@ -2032,13 +2052,18 @@ async function voltarOrdemParaOrcamento(i){
   const os = serviceOrders[i];
   if(!os)return;
   if(!confirm('Tem certeza de que deseja voltar esta Ordem de Serviço para orçamento?\n\nCliente: '+(os.cliente||'-')+'\nVeículo: '+(os.veiculo||'-')+' '+(os.placa||'-')+'\n\nEla sairá da lista de OS em andamento e voltará para Orçamentos em aberto.')) return;
-  const q = quotes.find(x=>x.id===os.quoteId);
-  if(q) q.status='Aberto';
-  serviceOrders.splice(i,1);
-  renderQuotes(); renderOS(); atualizarDashboard();
-  const ok = await salvarAgora();
-  if(!ok){
-    alert('ATENÇÃO: essa mudança NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+  try{
+    const q = quotes.find(x=>x.id===os.quoteId);
+    if(q) q.status='Aberto';
+    serviceOrders.splice(i,1);
+    renderQuotes(); renderOS(); atualizarDashboard();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: essa mudança NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    }
+  }catch(e){
+    console.error('Erro ao voltar OS para orçamento:', e);
+    alert('ERRO ao voltar esta OS para orçamento — NÃO foi concluído nem salvo.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
   }
 }
 
@@ -2119,33 +2144,38 @@ Veículo: ${s.veiculo||'-'} ${s.placa||'-'}
 Os pagamentos já lançados e a entrada financeira gerada serão removidos, o estoque de peças usadas será devolvido, e ela voltará para "Ordens de serviço aprovadas" para você relançar o pagamento corretamente.
 
 Esta ação não pode ser desfeita automaticamente.`)) return;
-  const removido = _reverterServicoConcluido(id);
-  if(!removido) return;
+  try{
+    const removido = _reverterServicoConcluido(id);
+    if(!removido) return;
 
-  const q = quotes.find(x=>x.id===removido.quoteId);
-  if(q) q.status="OS";
+    const q = quotes.find(x=>x.id===removido.quoteId);
+    if(q) q.status="OS";
 
-  serviceOrders.push({
-    quoteId: removido.quoteId,
-    cliente: removido.cliente,
-    veiculo: removido.veiculo,
-    placa: removido.placa,
-    km: removido.km||"",
-    obs: removido.obs||"",
-    clientId: removido.clientId||null,
-    subtotal: removido.subtotal!=null?removido.subtotal:removido.total,
-    desconto: removido.desconto||0,
-    total: removido.total,
-    status:"Aprovado",
-    items: JSON.parse(JSON.stringify(removido.items||[])),
-    funcionarioId:"",
-    pagamentos:[],
-    createdAt: removido.data
-  });
+    serviceOrders.push({
+      quoteId: removido.quoteId,
+      cliente: removido.cliente,
+      veiculo: removido.veiculo,
+      placa: removido.placa,
+      km: removido.km||"",
+      obs: removido.obs||"",
+      clientId: removido.clientId||null,
+      subtotal: removido.subtotal!=null?removido.subtotal:removido.total,
+      desconto: removido.desconto||0,
+      total: removido.total,
+      status:"Aprovado",
+      items: JSON.parse(JSON.stringify(removido.items||[])),
+      funcionarioId:"",
+      pagamentos:[],
+      createdAt: removido.data
+    });
 
-  renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard();
-  const ok = await salvarAgora();
-  alert(ok ? "Ordem de Serviço reaberta. Ela está novamente em Ordens de serviço aprovadas." : ("ATENÇÃO: a reabertura NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: "+window._ultimoErroSalvamento));
+    renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard();
+    const ok = await salvarAgora();
+    alert(ok ? "Ordem de Serviço reaberta. Ela está novamente em Ordens de serviço aprovadas." : ("ATENÇÃO: a reabertura NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: "+window._ultimoErroSalvamento));
+  }catch(e){
+    console.error('Erro ao reabrir OS:', e);
+    alert('ERRO ao reabrir esta Ordem de Serviço — NÃO foi concluído nem salvo.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
 }
 async function reabrirParaOrcamento(id){
   const s = servicosConcluidos.find(x=>x.id===id); if(!s)return;
@@ -2157,15 +2187,20 @@ Veículo: ${s.veiculo||'-'} ${s.placa||'-'}
 Os pagamentos já lançados e a entrada financeira gerada serão removidos, o estoque de peças usadas será devolvido, e ele voltará para a lista de orçamentos em aberto.
 
 Esta ação não pode ser desfeita automaticamente.`)) return;
-  const removido = _reverterServicoConcluido(id);
-  if(!removido) return;
+  try{
+    const removido = _reverterServicoConcluido(id);
+    if(!removido) return;
 
-  const q = quotes.find(x=>x.id===removido.quoteId);
-  if(q) q.status="Aberto";
+    const q = quotes.find(x=>x.id===removido.quoteId);
+    if(q) q.status="Aberto";
 
-  renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard();
-  const ok = await salvarAgora();
-  alert(ok ? "Serviço devolvido para a lista de orçamentos em aberto." : ("ATENÇÃO: essa mudança NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: "+window._ultimoErroSalvamento));
+    renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard();
+    const ok = await salvarAgora();
+    alert(ok ? "Serviço devolvido para a lista de orçamentos em aberto." : ("ATENÇÃO: essa mudança NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: "+window._ultimoErroSalvamento));
+  }catch(e){
+    console.error('Erro ao voltar serviço para orçamento:', e);
+    alert('ERRO ao voltar este serviço para orçamento — NÃO foi concluído nem salvo.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
 }
 
 function gerarPDFConcluido(id){
