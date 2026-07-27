@@ -1020,15 +1020,22 @@ async function enviarParaSupabase(){
   const dados=_coletarDados();
   _salvarBackupLocal(dados, ts);
   try{
-    const { error } = await sb.from('estado_sistema')
-      .upsert({ id: ESTADO_ID, dados, atualizado_em: new Date(ts).toISOString() });
+    const { data, error } = await sb.from('estado_sistema')
+      .upsert({ id: ESTADO_ID, dados, atualizado_em: new Date(ts).toISOString() })
+      .select();
     if(error) throw error;
+    if(!data || data.length===0){
+      // O Supabase respondeu sem erro, mas nenhuma linha foi realmente gravada —
+      // geralmente sinal de bloqueio de permissão (RLS) silencioso. Trata como falha.
+      throw new Error('Nenhuma linha foi gravada no banco (possível bloqueio de permissão/RLS).');
+    }
     _temPendencia=false;
     window._ultimoTsConhecido = ts;
     mostrarStatus('ok');
     return true;
   }catch(e){
     console.error('Erro ao salvar no Supabase:', e);
+    window._ultimoErroSalvamento = (e && (e.message||e.details||e.hint)) || String(e);
     mostrarStatus('err'); // aviso vermelho permanece na tela até salvar de novo
     return false;
   }
@@ -1796,7 +1803,7 @@ async function finalizarOrcamento(){
   formOrcamento.style.display='none'; editingQuoteId=null; limparOrcamentosAntigos(); renderQuotes(); renderOS(); renderClientes(); atualizarDashboard();
   const ok = await salvarAgora();
   if(!ok){
-    alert('ATENÇÃO: este orçamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente salvar novamente.');
+    alert('ATENÇÃO: este orçamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente salvar novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
   }
 }
 
@@ -1857,7 +1864,7 @@ async function aprovarOrcamento(id){
   renderQuotes(); renderOS(); atualizarDashboard();
   const ok = await salvarAgora();
   if(!ok){
-    alert('ATENÇÃO: a aprovação desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente aprovar novamente.');
+    alert('ATENÇÃO: a aprovação desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente aprovar novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
   }
 }
 function _totalPagoOS(os){
@@ -1952,7 +1959,7 @@ async function confirmarPagamentoOS(){
   renderOS(); renderEntradas(); atualizarDashboard();
   const ok = await salvarAgora();
   if(!ok){
-    alert('ATENÇÃO: este pagamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador nem atualize a página agora — verifique sua internet e tente lançar o pagamento novamente em alguns segundos.');
+    alert('ATENÇÃO: este pagamento NÃO foi salvo no servidor (falha de conexão). Não feche o navegador nem atualize a página agora — verifique sua internet e tente lançar o pagamento novamente em alguns segundos.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
   }
 }
 function excluirPagamentoOS(i, pagamentoId){
@@ -2007,7 +2014,7 @@ async function _finalizarOS(i){
   atualizarDashboard();
   const ok = await salvarAgora();
   if(!ok){
-    alert('ATENÇÃO: a conclusão desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Os dados ainda estão na sua tela — não feche o navegador. Verifique sua internet e tente novamente em alguns segundos: use o botão "Reabrir p/ OS" em Serviços Concluídos e refaça o pagamento, ou aguarde a reconexão automática.');
+    alert('ATENÇÃO: a conclusão desta Ordem de Serviço NÃO foi salva no servidor (falha de conexão). Os dados ainda estão na sua tela — não feche o navegador. Verifique sua internet e tente novamente em alguns segundos: use o botão "Reabrir p/ OS" em Serviços Concluídos e refaça o pagamento, ou aguarde a reconexão automática.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
   }
 }
 
@@ -2021,14 +2028,18 @@ function editarOrdemServico(i){
   }
 }
 
-function voltarOrdemParaOrcamento(i){
+async function voltarOrdemParaOrcamento(i){
   const os = serviceOrders[i];
   if(!os)return;
   if(!confirm('Tem certeza de que deseja voltar esta Ordem de Serviço para orçamento?\n\nCliente: '+(os.cliente||'-')+'\nVeículo: '+(os.veiculo||'-')+' '+(os.placa||'-')+'\n\nEla sairá da lista de OS em andamento e voltará para Orçamentos em aberto.')) return;
   const q = quotes.find(x=>x.id===os.quoteId);
   if(q) q.status='Aberto';
   serviceOrders.splice(i,1);
-  renderQuotes(); renderOS(); atualizarDashboard(); salvarAgora();
+  renderQuotes(); renderOS(); atualizarDashboard();
+  const ok = await salvarAgora();
+  if(!ok){
+    alert('ATENÇÃO: essa mudança NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+  }
 }
 
 function pesquisarConcluidos(){
@@ -2134,7 +2145,7 @@ Esta ação não pode ser desfeita automaticamente.`)) return;
 
   renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard();
   const ok = await salvarAgora();
-  alert(ok ? "Ordem de Serviço reaberta. Ela está novamente em Ordens de serviço aprovadas." : "ATENÇÃO: a reabertura NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.");
+  alert(ok ? "Ordem de Serviço reaberta. Ela está novamente em Ordens de serviço aprovadas." : ("ATENÇÃO: a reabertura NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: "+window._ultimoErroSalvamento));
 }
 async function reabrirParaOrcamento(id){
   const s = servicosConcluidos.find(x=>x.id===id); if(!s)return;
@@ -2154,7 +2165,7 @@ Esta ação não pode ser desfeita automaticamente.`)) return;
 
   renderQuotes(); renderOS(); renderEntradas(); renderConcluidos(); renderEstoque(); renderFuncionarios(); atualizarDashboard();
   const ok = await salvarAgora();
-  alert(ok ? "Serviço devolvido para a lista de orçamentos em aberto." : "ATENÇÃO: essa mudança NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.");
+  alert(ok ? "Serviço devolvido para a lista de orçamentos em aberto." : ("ATENÇÃO: essa mudança NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: "+window._ultimoErroSalvamento));
 }
 
 function gerarPDFConcluido(id){
