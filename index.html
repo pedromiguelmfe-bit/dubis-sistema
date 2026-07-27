@@ -1199,8 +1199,6 @@ function atualizarDashboard(){
   if(document.getElementById('dashTabelaContasHoje')){
     dashTabelaContasHoje.innerHTML = contasHoje.length ? contasHoje.map(c=>`<tr><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.status)}</td><td>${moeda(c.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma conta para hoje.</td></tr>';
   }
-
-  atualizarFinanceiro();
 }
 
 
