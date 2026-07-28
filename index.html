@@ -2012,7 +2012,7 @@ function renderFiados(){
       </td>
       <td><span class="badge ${cor}">${st}</span></td>
       <td><input value="${escapeHtml(o.obsAcordo||'')}" placeholder="Observações" style="width:140px" onchange="alterarCampoFiado('${o.quoteId}','obsAcordo',this.value)"></td>
-      <td><button class="green" onclick="abrirLancarPagamentoPorQuoteId('${o.quoteId}')">Lançar pagamento</button></td>
+      <td><button class="green" onclick="abrirLancarPagamentoPorQuoteId('${o.quoteId}')">Lançar pagamento</button> <button class="gray" onclick="enviarCobrancaWhatsapp('${o.quoteId}')">Enviar Cobrança</button></td>
     </tr>`;
   }).join('');
 }
@@ -2110,6 +2110,7 @@ function renderOS(){
       <td>
         <div style="font-size:12px"><strong>Pago: ${moeda(totalPago)}</strong> de ${moeda(o.total)}<br>Saldo: ${moeda(saldo)}</div>
         <button class="green" style="margin-top:5px" onclick="abrirLancarPagamentoOS(${i})">Lançar pagamento</button>
+        <button class="gray" style="margin-top:5px" onclick="enviarCobrancaWhatsapp('${o.quoteId}')">Enviar Cobrança</button>
         ${listaPagamentos}
       </td>
       <td>
@@ -2126,6 +2127,44 @@ function vincularFuncionarioOS(i, funcionarioId){
   renderOS();
 }
 
+/* ===== Cobrança pelo WhatsApp ===== */
+function _telefoneCliente(os){
+  if(os.clientId){
+    const c = clients.find(x=>String(x.id)===String(os.clientId));
+    if(c && c.tel) return c.tel;
+  }
+  const c2 = clients.find(x=>normalizarTextoBusca(x.nome)===normalizarTextoBusca(os.cliente));
+  return c2 ? (c2.tel||'') : '';
+}
+function _formatarTelefoneWhatsapp(tel){
+  let digits = String(tel||'').replace(/\D/g,'');
+  if(!digits) return '';
+  if(!digits.startsWith('55')) digits = '55'+digits;
+  return digits;
+}
+function _mensagemCobranca(os){
+  const saldo = Math.max(0, Number(os.total||0)-_totalPagoOS(os));
+  const valor = (os.valorProximaParcela && Number(os.valorProximaParcela)>0) ? Number(os.valorProximaParcela) : saldo;
+  const st = _statusAcordo(os);
+  let quando;
+  if(st==='Vencido' && os.proximoVencimento) quando = `está em atraso desde ${dataBR(os.proximoVencimento)}`;
+  else if(st==='Vence hoje') quando = 'vence hoje';
+  else if(os.proximoVencimento) quando = `vence em ${dataBR(os.proximoVencimento)}`;
+  else quando = 'está em aberto';
+  return `Olá, ${os.cliente}! Tudo bem?\n\nPassando para lembrar que ${quando} o pagamento referente à Ordem de Serviço nº ${os.quoteId}, no valor de ${moeda(valor)}.\n\nQualquer dúvida, estamos à disposição.\n\nEquipe Dubis Serviços Automotivos.`;
+}
+function enviarCobrancaWhatsapp(quoteId){
+  const achado = _buscarRegistroPorQuoteId(quoteId);
+  if(!achado){ alert('Não foi possível localizar esta Ordem de Serviço.'); return; }
+  const os = achado.obj;
+  const tel = _formatarTelefoneWhatsapp(_telefoneCliente(os));
+  if(!tel){
+    alert('Este cliente não tem telefone/WhatsApp cadastrado. Cadastre o telefone dele na aba Clientes para poder enviar a cobrança.');
+    return;
+  }
+  const msg = _mensagemCobranca(os);
+  window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg), '_blank');
+}
 function _buscarRegistroPorQuoteId(quoteId){
   let idx = serviceOrders.findIndex(o=>String(o.quoteId)===String(quoteId));
   if(idx!==-1) return {tipo:'os', obj:serviceOrders[idx], index:idx};
