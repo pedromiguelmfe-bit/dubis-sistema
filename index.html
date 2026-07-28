@@ -375,6 +375,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <button onclick="abrirFinanceiro('finSaidas', this)">Saídas</button>
       <button onclick="abrirFinanceiro('finMovimentacoes', this)">Movimentações e Resultados</button>
       <button onclick="abrirFinanceiro('finCalendario', this)">Calendário Financeiro</button>
+      <button onclick="abrirFinanceiro('finRelatorios', this)">Relatórios</button>
       <button class="dark" onclick="gerarRelatorioMensal()">Relatório mensal PDF</button>
     </div>
   </div>
@@ -776,6 +777,40 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     </div>
   </div>
 
+  <div id="finRelatorios" class="finance-subsection">
+    <div class="panel">
+      <h3>Relatórios Financeiros</h3>
+      <p class="muted">Visão geral de recebimentos e da saúde financeira das Ordens de Serviço.</p>
+
+      <div class="calfin-nav">
+        <button class="gray" onclick="relMesAnterior()">‹ Mês anterior</button>
+        <strong id="relMesTitulo">-</strong>
+        <button class="gray" onclick="relProximoMes()">Próximo mês ›</button>
+      </div>
+
+      <div class="cp-cards" style="grid-template-columns:repeat(3,1fr);margin-top:10px">
+        <div class="cp-card c-verde"><small>Total recebido no período</small><div class="cp-val" id="relRecebido">R$ 0,00</div></div>
+        <div class="cp-card c-laranja"><small>Total ainda a receber (hoje)</small><div class="cp-val" id="relAReceber">R$ 0,00</div></div>
+        <div class="cp-card c-vermelho"><small>Total vencido (hoje)</small><div class="cp-val" id="relVencido">R$ 0,00</div></div>
+      </div>
+      <div class="cp-cards" style="grid-template-columns:repeat(3,1fr);margin-top:10px">
+        <div class="cp-card c-cinza"><small>Clientes inadimplentes</small><div class="cp-val" id="relInadimplentes">0</div></div>
+        <div class="cp-card c-amar"><small>Ordens parcialmente pagas</small><div class="cp-val" id="relParciais">0</div></div>
+        <div class="cp-card c-preto"><small>Ordens quitadas</small><div class="cp-val" id="relQuitadas">0</div></div>
+      </div>
+
+      <div style="margin-top:16px">
+        <h4 style="font-size:14px;margin-bottom:6px">Fluxo de recebimentos por mês (últimos 6 meses)</h4>
+        <div id="relFluxoMensal" class="rec-table-wrap"></div>
+      </div>
+
+      <div style="margin-top:16px">
+        <h4 style="font-size:14px;margin-bottom:6px">Clientes inadimplentes (com parcela vencida)</h4>
+        <div id="relListaInadimplentes" class="rec-table-wrap"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="cp-modal-overlay" id="modalDetalheOSOverlay">
     <div class="cp-modal wide">
       <h3>Detalhamento do serviço</h3>
@@ -1170,7 +1205,7 @@ function envolverTabelasComScroll(){
 function renderTudo(){
   limparOrcamentosAntigos();
   renderQuotes(); renderOS(); renderFinanceiro('todos'); renderEntradas();
-  renderSaidas(); renderClientes(); renderFuncionarios(); renderConcluidos(); renderFiados(); renderMovimentacoes(); renderCalendarioFinanceiro(); renderEstoque();
+  renderSaidas(); renderClientes(); renderFuncionarios(); renderConcluidos(); renderFiados(); renderMovimentacoes(); renderCalendarioFinanceiro(); renderRelatorios(); renderEstoque();
   atualizarDashboard();
 }
 function abrir(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');titulo.innerText={dashboard:'Dashboard',orcamentos:'Orçamentos',os:'Ordens de Serviço',concluidos:'Serviços Concluídos',fiados:'Fiados e Acordos',financeiro:'Financeiro',estoque:'Estoque',fornecedores:'Fornecedores',funcionarios:'Funcionários',clientes:'Clientes'}[id]}
@@ -1197,7 +1232,7 @@ function abrirFinanceiro(id,btn){
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.finance-tabs button').forEach(b=>b.classList.remove('activeTab'));
   if(btn)btn.classList.add('activeTab');
-  renderFinanceiro(window.filtroAtual||'todos'); renderEntradas(); renderSaidas(); renderMovimentacoes(); renderCalendarioFinanceiro(); atualizarResumoFinanceiro(window.filtroAtual||'todos');
+  renderFinanceiro(window.filtroAtual||'todos'); renderEntradas(); renderSaidas(); renderMovimentacoes(); renderCalendarioFinanceiro(); renderRelatorios(); atualizarResumoFinanceiro(window.filtroAtual||'todos');
 }
 
 function atualizarDashboard(){
@@ -2082,6 +2117,70 @@ function renderRecebimentosPendentes(){
       <td><span class="badge ${cor}">${st}</span></td>
     </tr>`;
   }).join('');
+}
+
+/* ===== Relatórios Financeiros ===== */
+function relMesAnterior(){ window.relMesRef = _mesAnteriorISO(window.relMesRef||mesAtualISO()); renderRelatorios(); }
+function relProximoMes(){ window.relMesRef = _proximoMesISO(window.relMesRef||mesAtualISO()); renderRelatorios(); }
+function renderRelatorios(){
+  if(!document.getElementById('relFluxoMensal'))return;
+  const mesRef = window.relMesRef || mesAtualISO();
+  const lbl = _mesLabelPt(mesRef);
+  document.getElementById('relMesTitulo').innerText = lbl.charAt(0).toUpperCase()+lbl.slice(1);
+
+  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
+
+  // Total recebido no mês selecionado
+  const totalRecebido = entradas.filter(e=>String(e.data||'').slice(0,7)===mesRef)
+    .reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
+  setTxt('relRecebido', moeda(totalRecebido));
+
+  // Situação atual dos fiados (não é por período — é a foto de hoje)
+  const listaF = _listaFiados();
+  const totalAReceber = listaF.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
+  const vencidos = listaF.filter(o=>_statusAcordo(o)==='Vencido');
+  const totalVencido = vencidos.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
+  const clientesInadimplentes = [...new Map(vencidos.map(o=>[o.clientId||o.cliente, o])).values()];
+  setTxt('relAReceber', moeda(totalAReceber));
+  setTxt('relVencido', moeda(totalVencido));
+  setTxt('relInadimplentes', clientesInadimplentes.length);
+
+  // Ordens parcialmente pagas / quitadas, considerando ativas e já concluídas
+  const todasOS = [...serviceOrders, ...servicosConcluidos];
+  const parciais = todasOS.filter(o=>_statusFinanceiroOS(o)==='Parcialmente pago').length;
+  const quitadas = todasOS.filter(o=>_statusFinanceiroOS(o)==='Totalmente pago').length;
+  setTxt('relParciais', parciais);
+  setTxt('relQuitadas', quitadas);
+
+  // Fluxo de recebimentos dos últimos 6 meses, terminando no mês selecionado
+  const linhas=[];
+  let m = mesRef;
+  for(let i=0;i<6;i++){
+    const total = entradas.filter(e=>String(e.data||'').slice(0,7)===m)
+      .reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
+    linhas.push({m, total});
+    m = _mesAnteriorISO(m);
+  }
+  linhas.reverse();
+  const maiorValor = Math.max(1, ...linhas.map(l=>l.total));
+  document.getElementById('relFluxoMensal').innerHTML = '<table class="rec-table"><thead><tr><th>Mês</th><th>Total recebido</th><th></th></tr></thead><tbody>' +
+    linhas.map(l=>{
+      const mlbl=_mesLabelPt(l.m);
+      const pct = Math.round((l.total/maiorValor)*100);
+      return `<tr><td>${mlbl.charAt(0).toUpperCase()+mlbl.slice(1)}</td><td>${moeda(l.total)}</td><td style="width:40%"><div style="background:#16a34a;height:10px;border-radius:5px;width:${pct}%"></div></td></tr>`;
+    }).join('') + '</tbody></table>';
+
+  // Lista de clientes inadimplentes (com valor vencido total)
+  const contInad = document.getElementById('relListaInadimplentes');
+  if(contInad){
+    if(clientesInadimplentes.length===0){
+      contInad.innerHTML = '<p class="muted">Nenhum cliente inadimplente no momento. 🎉</p>';
+    } else {
+      contInad.innerHTML = '<table class="rec-table"><thead><tr><th>Cliente</th><th>OS</th><th>Valor vencido</th></tr></thead><tbody>' +
+        vencidos.map(o=>`<tr><td>${escapeHtml(o.cliente||'-')}</td><td>#${escapeHtml(String(o.quoteId||'-'))}</td><td>${moeda(Math.max(0,Number(o.total||0)-_totalPagoOS(o)))}</td></tr>`).join('') +
+        '</tbody></table>';
+    }
+  }
 }
 function renderOS(){
   listaOS.innerHTML='';
