@@ -200,26 +200,10 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 </header>
 
 <section id="dashboard" class="section active">
-  <div id="dashAlertasFiados"></div>
-
-  <div class="panel" id="painelRecebimentosPendentes">
-    <h3>Recebimentos Pendentes</h3>
-    <div class="cp-cards" style="grid-template-columns:repeat(5,1fr)">
-      <div class="cp-card c-laranja"><small>Total a receber</small><div class="cp-val" id="rpTotalReceber">R$ 0,00</div></div>
-      <div class="cp-card c-cinza"><small>Clientes com saldo</small><div class="cp-val" id="rpQtdClientes">0</div></div>
-      <div class="cp-card c-vermelho"><small>Vencidos</small><div class="cp-val" id="rpVencidos">R$ 0,00</div></div>
-      <div class="cp-card c-amar"><small>Vencem hoje</small><div class="cp-val" id="rpHoje">R$ 0,00</div></div>
-      <div class="cp-card c-preto"><small>Vencem em 7 dias</small><div class="cp-val" id="rp7Dias">R$ 0,00</div></div>
-    </div>
-    <table style="margin-top:12px">
-      <thead><tr><th>Cliente</th><th>OS</th><th>Valor da parcela</th><th>Saldo restante</th><th>Vencimento</th><th>Status</th></tr></thead>
-      <tbody id="listaRecebimentosPendentes"></tbody>
-    </table>
-  </div>
-
   <div class="cards">
     <div class="card" onclick="abrirFinanceiroHoje()"><small>Contas para pagar hoje</small><h3 id="dashHojePagar">R$ 0,00</h3></div>
     <div class="card" onclick="abrirPorId('financeiro')"><small>Contas vencidas</small><h3 id="dashVencidas">R$ 0,00</h3></div>
+
     <div class="card" onclick="abrirPorId('financeiro')"><small>Contas pagas (mês)</small><h3 id="dashPagas">R$ 0,00</h3></div>
     <div class="card" onclick="abrirPorId('orcamentos')"><small>Orçamentos do dia</small><h3 id="dashOrcDia">0</h3></div>
     <div class="card" onclick="abrirPorId('orcamentos')"><small>Orçamentos em aberto</small><h3 id="dashOrcAberto">0</h3></div>
@@ -305,13 +289,23 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 <section id="os" class="section">
   <div class="panel">
     <h3>Ordens de serviço aprovadas</h3>
-    <p class="muted">Agora o status do serviço e o status financeiro são independentes: marcar como "Concluído" move a OS pra Serviços Concluídos mesmo que ainda falte receber — o controle do saldo devedor continua acompanhado separadamente. Lance quantos pagamentos parciais forem necessários, na data real de cada um.</p>
-    <table>
-      <thead><tr><th>Cliente</th><th>Veículo</th><th>Placa</th><th>Valor</th><th>Status serviço / financeiro</th><th>Funcionário</th><th>Pagamento</th><th>Ações</th></tr></thead>
-      <tbody id="listaOS"></tbody>
-    </table>
+    <p class="muted">Vincule o funcionário responsável, lance pagamentos e conclua o serviço quando terminar.</p>
+    <div id="listaOS"></div>
   </div>
 </section>
+
+<div class="cp-modal-overlay" id="modalConcluirOSOverlay">
+  <div class="cp-modal">
+    <h3>Concluir serviço</h3>
+    <div id="concluirResumo" class="muted" style="margin-bottom:12px"></div>
+    <p>Esta OS ainda não foi totalmente paga. O que deseja fazer?</p>
+    <div class="actions">
+      <button class="green" onclick="escolherLancarPagamentoAoConcluir()">Lançar pagamento</button>
+      <button class="dark" onclick="escolherEnviarParaFiados()">Enviar para Fiados e Acordos</button>
+      <button class="gray" onclick="fecharModalConcluirOS()">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 <div class="cp-modal-overlay" id="modalPagamentoOSOverlay">
   <div class="cp-modal">
@@ -339,10 +333,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <div class="grid2">
       <div><label>Buscar serviço concluído (neste mês)</label><input id="buscaConcluidos" placeholder="Nome, placa ou veículo" oninput="pesquisarConcluidos()"></div>
     </div>
-    <table>
-      <thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Placa</th><th>Valor</th><th>Status financeiro</th><th>Forma</th><th>Funcionário</th><th>Ações</th></tr></thead>
-      <tbody id="listaConcluidos"></tbody>
-    </table>
+    <div id="listaConcluidos"></div>
     <p class="muted" style="margin-top:10px">Procurando um serviço de um mês anterior? <button class="gray" onclick="irParaMovimentacoesFinanceiro()">Ver no Financeiro</button></p>
   </div>
 </section>
@@ -350,19 +341,24 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 <section id="fiados" class="section">
   <div class="panel">
     <h3>Fiados e Acordos</h3>
-    <p class="muted">Lista automaticamente toda Ordem de Serviço — em andamento ou já concluída — que ainda tem saldo devedor. Assim que quitar, ela sai sozinha daqui.</p>
-    <div class="cp-cards" style="grid-template-columns:repeat(4,1fr)">
+    <p class="muted">Clientes com saldo devedor de Ordens de Serviço. Clique em "Visualizar cobranças" para ver e gerenciar as parcelas combinadas.</p>
+    <div class="cp-cards" style="grid-template-columns:repeat(2,1fr)">
       <div class="cp-card c-laranja"><small>Total a receber (fiados)</small><div class="cp-val" id="fiTotalDevedor">R$ 0,00</div></div>
-      <div class="cp-card c-vermelho"><small>Vencidos</small><div class="cp-val" id="fiTotalVencido">R$ 0,00</div></div>
-      <div class="cp-card c-amar"><small>Vencem hoje</small><div class="cp-val" id="fiTotalHoje">R$ 0,00</div></div>
       <div class="cp-card c-cinza"><small>Clientes devendo</small><div class="cp-val" id="fiQtdClientes">0</div></div>
     </div>
-    <table style="margin-top:14px">
-      <thead><tr><th>Cliente</th><th>OS</th><th>Total</th><th>Pago</th><th>Saldo devedor</th><th>Último pagamento</th><th>Próxima parcela</th><th>Status do acordo</th><th>Observações</th><th>Ação</th></tr></thead>
-      <tbody id="listaFiados"></tbody>
-    </table>
+    <div id="listaFiados" style="margin-top:14px"></div>
   </div>
 </section>
+
+<div class="cp-modal-overlay" id="modalCobrancasOverlay">
+  <div class="cp-modal wide">
+    <h3 id="cobrancasTitulo">Cobranças</h3>
+    <div id="cobrancasConteudo"></div>
+    <div class="actions">
+      <button class="gray" onclick="fecharModalCobrancas()">Fechar</button>
+    </div>
+  </div>
+</div>
 
 <section id="financeiro" class="section">
   <div class="panel">
@@ -1274,7 +1270,6 @@ function atualizarDashboard(){
   if(document.getElementById('dashTabelaContasHoje')){
     dashTabelaContasHoje.innerHTML = contasHoje.length ? contasHoje.map(c=>`<tr><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.status)}</td><td>${moeda(c.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma conta para hoje.</td></tr>';
   }
-  if(typeof renderRecebimentosPendentes==='function') renderRecebimentosPendentes();
 }
 
 
@@ -1971,11 +1966,17 @@ function _diasAteVencimento(vencISO){
   const venc = new Date(vencISO+'T00:00:00');
   return Math.round((venc-hoje)/(1000*60*60*24));
 }
+function _proximaParcelaPendente(os){
+  const pendentes = (os.parcelasAcordo||[]).filter(p=>!p.pago);
+  if(!pendentes.length) return null;
+  return [...pendentes].sort((a,b)=>String(a.data).localeCompare(String(b.data)))[0];
+}
 function _statusAcordo(os){
   const saldo = Math.max(0, Number(os.total||0) - _totalPagoOS(os));
   if(saldo<=0.009) return 'Quitado';
-  if(!os.proximoVencimento) return 'Em dia';
-  const dias = _diasAteVencimento(os.proximoVencimento);
+  const prox = _proximaParcelaPendente(os);
+  if(!prox) return 'Em dia';
+  const dias = _diasAteVencimento(prox.data);
   if(dias<0) return 'Vencido';
   if(dias===0) return 'Vence hoje';
   if(dias<=7) return 'Próximo do vencimento';
@@ -1991,132 +1992,159 @@ function _listaFiados(){
   });
   return lista;
 }
-async function alterarCampoFiado(quoteId, campo, valor){
-  const achado=_buscarRegistroPorQuoteId(quoteId); if(!achado)return;
-  try{
-    achado.obj[campo] = campo==='valorProximaParcela' ? (valor===''?'':Number(valor)) : valor;
-    renderFiados();
-    const ok = await salvarAgora();
-    if(!ok){
-      alert('ATENÇÃO: essa alteração NÃO foi salva no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
-    }
-  }catch(e){
-    console.error('Erro ao alterar dados do acordo:', e);
-    alert('ERRO ao salvar essa alteração.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
-  }
+function _clientesFiados(){
+  const lista=_listaFiados();
+  const grupos={};
+  const ordem=[];
+  lista.forEach(o=>{
+    const chave = o.clientId ? ('id:'+o.clientId) : ('nome:'+normalizarTextoBusca(o.cliente));
+    if(!grupos[chave]){ grupos[chave]={nome:o.cliente, os:[]}; ordem.push(chave); }
+    grupos[chave].os.push(o);
+  });
+  return ordem.map(k=>grupos[k]);
 }
 function renderFiados(){
   const cont=document.getElementById('listaFiados');
   if(!cont)return;
-  const lista=_listaFiados();
+  const grupos=_clientesFiados();
+  window.__gruposFiadosCache = grupos;
 
-  const totalDevedor = lista.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
-  const totalVencido = lista.filter(o=>_statusAcordo(o)==='Vencido').reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
-  const totalHoje = lista.filter(o=>_statusAcordo(o)==='Vence hoje').reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
-  const clientesUnicos = new Set(lista.map(o=>o.clientId || o.cliente)).size;
-
+  const totalDevedor = grupos.reduce((s,g)=>s+g.os.reduce((s2,o)=>s2+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0),0);
   const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
   setTxt('fiTotalDevedor', moeda(totalDevedor));
-  setTxt('fiTotalVencido', moeda(totalVencido));
-  setTxt('fiTotalHoje', moeda(totalHoje));
-  setTxt('fiQtdClientes', clientesUnicos);
+  setTxt('fiQtdClientes', grupos.length);
 
-  if(lista.length===0){
-    cont.innerHTML='<tr><td colspan="10" class="muted">Nenhum fiado em aberto no momento.</td></tr>';
+  if(grupos.length===0){
+    cont.innerHTML='<p class="muted">Nenhum cliente com saldo devedor no momento. 🎉</p>';
     return;
   }
-  const ordemStatus = {'Vencido':0,'Vence hoje':1,'Próximo do vencimento':2,'Em dia':3,'Quitado':4};
-  const ordenada = [...lista].sort((a,b)=>(ordemStatus[_statusAcordo(a)]??9)-(ordemStatus[_statusAcordo(b)]??9));
-
-  cont.innerHTML = ordenada.map(o=>{
-    const pago=_totalPagoOS(o);
-    const saldo=Math.max(0,Number(o.total||0)-pago);
-    const st=_statusAcordo(o);
-    const cor = st==='Vencido'?'red':st==='Vence hoje'?'orange':st==='Próximo do vencimento'?'amar':st==='Quitado'?'green':'';
-    const ultimoPag = (o.pagamentos&&o.pagamentos.length) ? [...o.pagamentos].sort((a,b)=>String(b.data).localeCompare(String(a.data)))[0] : null;
-    return `<tr>
-      <td>${escapeHtml(o.cliente||'-')}</td>
-      <td>#${escapeHtml(String(o.quoteId||'-'))}</td>
-      <td>${moeda(o.total)}</td>
-      <td>${moeda(pago)}</td>
-      <td><strong>${moeda(saldo)}</strong></td>
-      <td>${ultimoPag ? dataBR(ultimoPag.data)+' — '+moeda(ultimoPag.valor) : '-'}</td>
-      <td>
-        <input type="date" value="${o.proximoVencimento||''}" style="width:130px" onchange="alterarCampoFiado('${o.quoteId}','proximoVencimento',this.value)"><br>
-        <input type="number" step="0.01" placeholder="Valor da parcela" value="${o.valorProximaParcela||''}" style="width:130px;margin-top:4px" onchange="alterarCampoFiado('${o.quoteId}','valorProximaParcela',this.value)">
-      </td>
-      <td><span class="badge ${cor}">${st}</span></td>
-      <td><input value="${escapeHtml(o.obsAcordo||'')}" placeholder="Observações" style="width:140px" onchange="alterarCampoFiado('${o.quoteId}','obsAcordo',this.value)"></td>
-      <td><button class="green" onclick="abrirLancarPagamentoPorQuoteId('${o.quoteId}')">Lançar pagamento</button> <button class="gray" onclick="enviarCobrancaWhatsapp('${o.quoteId}')">Enviar Cobrança</button></td>
-    </tr>`;
+  cont.innerHTML = grupos.map((g,gi)=>{
+    const totalDevido = g.os.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
+    const qtdOS = g.os.length;
+    return `<div class="client-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <strong>${escapeHtml(g.nome)}</strong>
+        <span class="badge red">${moeda(totalDevido)}</span>
+      </div>
+      <small>${qtdOS} orde${qtdOS>1?'ns':'m'} de serviço com saldo em aberto</small>
+      <div class="actions">
+        <button class="dark" onclick="abrirCobrancasCliente(${gi})">Visualizar cobranças</button>
+        <button class="gray" onclick="enviarCobrancaWhatsapp('${g.os[0].quoteId}')">Enviar Cobrança</button>
+      </div>
+    </div>`;
   }).join('');
 }
-
-/* ===== Dashboard: Recebimentos Pendentes + alertas de vencimento ===== */
-function renderAlertasFiados(){
-  const cont=document.getElementById('dashAlertasFiados');
-  if(!cont)return;
-  const lista=_listaFiados().filter(o=>o.proximoVencimento);
-  let vencidas=0, hoje=0, amanha=0;
-  lista.forEach(o=>{
-    const dias=_diasAteVencimento(o.proximoVencimento);
-    if(dias<0) vencidas++;
-    else if(dias===0) hoje++;
-    else if(dias===1) amanha++;
-  });
-  let html='';
-  if(vencidas>0) html += `<div class="alerta-fiado vermelho">🔴 Existe${vencidas>1?'m':''} ${vencidas} parcela${vencidas>1?'s':''} vencida${vencidas>1?'s':''}.</div>`;
-  if(hoje>0) html += `<div class="alerta-fiado amarelo">🟡 Hoje vence${hoje>1?'m':''} ${hoje} recebimento${hoje>1?'s':''}.</div>`;
-  if(amanha>0) html += `<div class="alerta-fiado verde">🟢 Amanhã vence${amanha>1?'m':''} ${amanha} parcela${amanha>1?'s':''}.</div>`;
-  cont.innerHTML = html;
+function abrirCobrancasCliente(gi){
+  const g=(window.__gruposFiadosCache||[])[gi]; if(!g)return;
+  window.__cobrancasClienteIndex=gi;
+  document.getElementById('cobrancasTitulo').innerText='Cobranças — '+g.nome;
+  renderCobrancasConteudo();
+  modalCobrancasOverlay.classList.add('aberto');
 }
-function abrirFiadoDoDashboard(quoteId){
-  abrirPorId('fiados');
+function fecharModalCobrancas(){ modalCobrancasOverlay.classList.remove('aberto'); renderFiados(); }
+function renderCobrancasConteudo(){
+  const gi=window.__cobrancasClienteIndex;
+  const g=(window.__gruposFiadosCache||[])[gi];
+  const cont=document.getElementById('cobrancasConteudo');
+  if(!g || !cont)return;
+  cont.innerHTML = g.os.map(o=>{
+    const saldo=Math.max(0, Number(o.total||0)-_totalPagoOS(o));
+    const parcelas=o.parcelasAcordo||[];
+    const somaPendentes = parcelas.filter(p=>!p.pago).reduce((s,p)=>s+Number(p.valor||0),0);
+    const faltaAgendar = Math.max(0, saldo-somaPendentes);
+    const linhasParcelas = parcelas.length ? [...parcelas].sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(p=>`
+      <tr>
+        <td>${dataBR(p.data)}</td>
+        <td>${moeda(p.valor)}</td>
+        <td>${p.pago?'<span class="badge green">Pago</span>':'<span class="badge orange">Pendente</span>'}</td>
+        <td>${p.pago?'-':`<button class="green" onclick="marcarParcelaAcordoPaga('${o.quoteId}','${p.id}')">Marcar como pago</button> <button class="red" onclick="excluirParcelaAcordo('${o.quoteId}','${p.id}')">Excluir</button>`}</td>
+      </tr>`).join('') : '<tr><td colspan="4" class="muted">Nenhuma parcela cadastrada ainda.</td></tr>';
+
+    return `<div class="panel" style="margin-bottom:14px">
+      <h4 style="margin-bottom:4px">OS #${escapeHtml(String(o.quoteId))} — ${escapeHtml(o.veiculo||'-')} ${escapeHtml(o.placa||'-')}</h4>
+      <small class="muted">Total: ${moeda(o.total)} · Saldo devedor: <strong>${moeda(saldo)}</strong>${faltaAgendar>0.009?(' · Falta agendar: '+moeda(faltaAgendar)):''}</small>
+      <table style="margin-top:8px">
+        <thead><tr><th>Data</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead>
+        <tbody>${linhasParcelas}</tbody>
+      </table>
+      <div style="display:flex;gap:8px;align-items:end;margin-top:10px;flex-wrap:wrap">
+        <div><label style="font-size:11px">Data da parcela</label><input type="date" id="novaParcelaData_${o.quoteId}" value="${dataHojeISO()}"></div>
+        <div><label style="font-size:11px">Valor</label><input type="number" step="0.01" id="novaParcelaValor_${o.quoteId}" placeholder="${faltaAgendar>0.009?faltaAgendar.toFixed(2):''}" style="max-width:120px"></div>
+        <button class="dark" onclick="adicionarParcelaAcordo('${o.quoteId}')">+ Adicionar parcela</button>
+      </div>
+    </div>`;
+  }).join('');
 }
-function renderRecebimentosPendentes(){
-  const cont=document.getElementById('listaRecebimentosPendentes');
-  if(!cont)return;
-  const lista=_listaFiados();
-
-  const totalReceber = lista.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
-  const clientesUnicos = new Set(lista.map(o=>o.clientId || o.cliente)).size;
-  const vencidos = lista.filter(o=>_statusAcordo(o)==='Vencido').reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
-  const hoje = lista.filter(o=>_statusAcordo(o)==='Vence hoje').reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
-  const em7dias = lista.filter(o=>{
-    if(!o.proximoVencimento) return false;
-    const dias=_diasAteVencimento(o.proximoVencimento);
-    return dias>=0 && dias<=7;
-  }).reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
-
-  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
-  setTxt('rpTotalReceber', moeda(totalReceber));
-  setTxt('rpQtdClientes', clientesUnicos);
-  setTxt('rpVencidos', moeda(vencidos));
-  setTxt('rpHoje', moeda(hoje));
-  setTxt('rp7Dias', moeda(em7dias));
-
-  renderAlertasFiados();
-
-  if(lista.length===0){
-    cont.innerHTML='<tr><td colspan="6" class="muted">Nenhum recebimento pendente no momento.</td></tr>';
-    return;
+async function adicionarParcelaAcordo(quoteId){
+  const achado=_buscarRegistroPorQuoteId(quoteId); if(!achado)return;
+  const os=achado.obj;
+  const dataInput=document.getElementById('novaParcelaData_'+quoteId);
+  const valorInput=document.getElementById('novaParcelaValor_'+quoteId);
+  const data=dataInput?dataInput.value:'';
+  const valor=Number(valorInput?valorInput.value:0);
+  if(!data){alert('Informe a data da parcela.');return}
+  if(!valor||valor<=0){alert('Informe o valor da parcela.');return}
+  try{
+    if(!os.parcelasAcordo) os.parcelasAcordo=[];
+    os.parcelasAcordo.push({id:Date.now()+Math.floor(Math.random()*100000), data, valor, pago:false});
+    renderCobrancasConteudo();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: essa parcela NÃO foi salva no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    }
+  }catch(e){
+    console.error('Erro ao adicionar parcela:', e);
+    alert('ERRO ao adicionar esta parcela.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
   }
-  const ordemStatus = {'Vencido':0,'Vence hoje':1,'Próximo do vencimento':2,'Em dia':3,'Quitado':4};
-  const ordenada = [...lista].sort((a,b)=>(ordemStatus[_statusAcordo(a)]??9)-(ordemStatus[_statusAcordo(b)]??9)).slice(0,15);
+}
+async function excluirParcelaAcordo(quoteId, parcelaId){
+  const achado=_buscarRegistroPorQuoteId(quoteId); if(!achado)return;
+  const os=achado.obj;
+  if(!confirm('Excluir esta parcela combinada? Isso não afeta pagamentos já recebidos, só remove o agendamento.'))return;
+  try{
+    os.parcelasAcordo=(os.parcelasAcordo||[]).filter(p=>String(p.id)!==String(parcelaId));
+    renderCobrancasConteudo();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: essa exclusão NÃO foi salva no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    }
+  }catch(e){
+    console.error('Erro ao excluir parcela:', e);
+    alert('ERRO ao excluir esta parcela.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
+}
+async function marcarParcelaAcordoPaga(quoteId, parcelaId){
+  const achado=_buscarRegistroPorQuoteId(quoteId); if(!achado)return;
+  const os=achado.obj;
+  const parcela=(os.parcelasAcordo||[]).find(p=>String(p.id)===String(parcelaId));
+  if(!parcela || parcela.pago) return;
+  if(!confirm(`Marcar esta parcela de ${moeda(parcela.valor)} (${dataBR(parcela.data)}) como paga?\n\nIsso vai lançar essa entrada no Financeiro, nessa mesma data.`)) return;
+  try{
+    if(!os.pagamentos) os.pagamentos=[];
+    const pagamentoId=Date.now()+Math.floor(Math.random()*100000);
+    const entradaId=pagamentoId+1;
+    os.pagamentos.push({id:pagamentoId, valor:parcela.valor, data:parcela.data, forma:'Acordo', obs:'Parcela do acordo de fiado', entradaId});
+    entradas.push({id:entradaId, data:parcela.data, descricao:'Parcela acordo - '+os.cliente+' - OS #'+os.quoteId, valor:parcela.valor, forma:'ACORDO', origem:'Ordem de Serviço', osRef:os.quoteId});
+    parcela.pago=true;
+    parcela.entradaId=entradaId;
 
-  cont.innerHTML = ordenada.map(o=>{
-    const saldo=Math.max(0,Number(o.total||0)-_totalPagoOS(o));
-    const st=_statusAcordo(o);
-    const cor = st==='Vencido'?'red':st==='Vence hoje'?'orange':st==='Próximo do vencimento'?'amar':st==='Quitado'?'green':'';
-    return `<tr style="cursor:pointer" onclick="abrirFiadoDoDashboard('${o.quoteId}')">
-      <td>${escapeHtml(o.cliente||'-')}</td>
-      <td>#${escapeHtml(String(o.quoteId||'-'))}</td>
-      <td>${o.valorProximaParcela?moeda(o.valorProximaParcela):'-'}</td>
-      <td>${moeda(saldo)}</td>
-      <td>${o.proximoVencimento?dataBR(o.proximoVencimento):'-'}</td>
-      <td><span class="badge ${cor}">${st}</span></td>
-    </tr>`;
-  }).join('');
+    const saldoAtual = Math.max(0, Number(os.total||0)-_totalPagoOS(os));
+    renderCobrancasConteudo(); renderOS(); renderConcluidos(); renderEntradas(); atualizarDashboard();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: esse pagamento NÃO foi salvo no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+      return;
+    }
+    if(saldoAtual<=0.009){
+      alert('Parcela quitada! Este acordo está totalmente pago e vai sair da lista de Fiados e Acordos.');
+      fecharModalCobrancas();
+    } else {
+      renderFiados();
+    }
+  }catch(e){
+    console.error('Erro ao marcar parcela como paga:', e);
+    alert('ERRO ao marcar esta parcela como paga.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
 }
 
 /* ===== Relatórios Financeiros ===== */
@@ -2183,41 +2211,36 @@ function renderRelatorios(){
   }
 }
 function renderOS(){
-  listaOS.innerHTML='';
+  const cont=document.getElementById('listaOS');
+  if(!cont)return;
   if(serviceOrders.length===0){
-    listaOS.innerHTML='<tr><td colspan="8" class="muted">Nenhuma ordem de serviço aprovada ainda.</td></tr>';
+    cont.innerHTML='<p class="muted">Nenhuma ordem de serviço aprovada ainda.</p>';
     return;
   }
-  serviceOrders.forEach((o,i)=>{
-    const optionsFuncionarios = '<option value="">Selecionar</option>' + funcionarios.map(f=>`<option value="${f.id}" ${String(o.funcionarioId||'')===String(f.id)?'selected':''}>${escapeHtml(f.nome)}</option>`).join('');
+  cont.innerHTML = serviceOrders.map((o,i)=>{
+    const optionsFuncionarios = '<option value="">Funcionário responsável</option>' + funcionarios.map(f=>`<option value="${f.id}" ${String(o.funcionarioId||'')===String(f.id)?'selected':''}>${escapeHtml(f.nome)}</option>`).join('');
     const totalPago=_totalPagoOS(o);
     const saldo=Math.max(0, Number(o.total||0)-totalPago);
-    const statusServico = o.statusServico || 'Aguardando';
     const statusFin = _statusFinanceiroOS(o);
-    const optsServico = ['Aguardando','Em andamento','Concluído'].map(s=>`<option value="${s}" ${statusServico===s?'selected':''}>${s}</option>`).join('');
     const listaPagamentos = (o.pagamentos||[]).length ? `<div style="margin-top:6px;font-size:11px" class="muted">` + o.pagamentos.map(p=>`${dataBR(p.data)} — ${moeda(p.valor)} (${escapeHtml(p.forma)}) <button class="red" style="padding:1px 5px;font-size:10px" onclick="excluirPagamentoOS(${i},'${p.id}')">x</button>`).join('<br>') + `</div>` : '';
-    listaOS.innerHTML += `<tr>
-      <td>${escapeHtml(o.cliente)}</td>
-      <td>${escapeHtml(o.veiculo||'-')}</td>
-      <td>${escapeHtml(o.placa||'-')}</td>
-      <td>${moeda(o.total)}</td>
-      <td>
-        <select onchange="alterarStatusServico(${i},this.value)">${optsServico}</select>
-        <div style="margin-top:4px">${_badgeStatusFinanceiro(statusFin)}</div>
-      </td>
-      <td><select onchange="vincularFuncionarioOS(${i},this.value)">${optionsFuncionarios}</select></td>
-      <td>
-        <div style="font-size:12px"><strong>Pago: ${moeda(totalPago)}</strong> de ${moeda(o.total)}<br>Saldo: ${moeda(saldo)}</div>
-        <button class="green" style="margin-top:5px" onclick="abrirLancarPagamentoOS(${i})">Lançar pagamento</button>
-        <button class="gray" style="margin-top:5px" onclick="enviarCobrancaWhatsapp('${o.quoteId}')">Enviar Cobrança</button>
-        ${listaPagamentos}
-      </td>
-      <td>
+    return `<div class="client-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <strong>${escapeHtml(o.cliente)}</strong>
+        ${_badgeStatusFinanceiro(statusFin)}
+      </div>
+      <small>${escapeHtml(o.veiculo||'-')} · Placa ${escapeHtml(o.placa||'-')} · Total ${moeda(o.total)}</small>
+      <div style="margin-top:8px"><select onchange="vincularFuncionarioOS(${i},this.value)">${optionsFuncionarios}</select></div>
+      <div style="font-size:12px;margin-top:6px"><strong>Pago: ${moeda(totalPago)}</strong> de ${moeda(o.total)} · Saldo: ${moeda(saldo)}</div>
+      ${listaPagamentos}
+      <div class="actions">
+        <button class="green" onclick="abrirLancarPagamentoOS(${i})">Lançar pagamento</button>
+        <button class="dark" onclick="tentarConcluirOS(${i})">Concluir serviço</button>
+        <button class="gray" onclick="enviarCobrancaWhatsapp('${o.quoteId}')">Enviar Cobrança</button>
         <button class="gray" onclick="editarOrdemServico(${i})">Editar OS</button>
         <button class="red" onclick="voltarOrdemParaOrcamento(${i})">Voltar</button>
-      </td>
-    </tr>`;
-  });
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function vincularFuncionarioOS(i, funcionarioId){
@@ -2243,12 +2266,13 @@ function _formatarTelefoneWhatsapp(tel){
 }
 function _mensagemCobranca(os){
   const saldo = Math.max(0, Number(os.total||0)-_totalPagoOS(os));
-  const valor = (os.valorProximaParcela && Number(os.valorProximaParcela)>0) ? Number(os.valorProximaParcela) : saldo;
+  const prox = _proximaParcelaPendente(os);
+  const valor = prox ? Number(prox.valor) : saldo;
   const st = _statusAcordo(os);
   let quando;
-  if(st==='Vencido' && os.proximoVencimento) quando = `está em atraso desde ${dataBR(os.proximoVencimento)}`;
+  if(st==='Vencido' && prox) quando = `está em atraso desde ${dataBR(prox.data)}`;
   else if(st==='Vence hoje') quando = 'vence hoje';
-  else if(os.proximoVencimento) quando = `vence em ${dataBR(os.proximoVencimento)}`;
+  else if(prox) quando = `vence em ${dataBR(prox.data)}`;
   else quando = 'está em aberto';
   return `Olá, ${os.cliente}! Tudo bem?\n\nPassando para lembrar que ${quando} o pagamento referente à Ordem de Serviço nº ${os.quoteId}, no valor de ${moeda(valor)}.\n\nQualquer dúvida, estamos à disposição.\n\nEquipe Dubis Serviços Automotivos.`;
 }
@@ -2339,32 +2363,30 @@ function excluirPagamentoOS(i, pagamentoId){
   os.pagamentos = (os.pagamentos||[]).filter(p=>String(p.id)!==String(pagamentoId));
   renderOS(); renderFiados(); renderEntradas(); atualizarDashboard(); salvarAgora();
 }
-async function alterarStatusServico(i, novoStatus){
+function tentarConcluirOS(i){
   const os = serviceOrders[i]; if(!os)return;
-  try{
-    if(novoStatus==='Concluído'){
-      const saldo = Math.max(0, Number(os.total||0) - _totalPagoOS(os));
-      let msg = `Marcar este serviço como concluído?\n\nCliente: ${os.cliente||'-'}\nVeículo: ${os.veiculo||'-'} ${os.placa||'-'}`;
-      if(saldo>0.009){
-        msg += `\n\n⚠️ Ainda falta receber ${moeda(saldo)} desta OS. Mesmo assim, ela será movida para Serviços Concluídos com o pagamento pendente — o status financeiro continua sendo acompanhado separadamente.`;
-      } else {
-        msg += `\n\nO pagamento já está totalmente quitado. Ela será movida para Serviços Concluídos.`;
-      }
-      if(!confirm(msg)) return;
-      os.statusServico='Concluído';
-      await _finalizarOS(i);
-      return;
+  const saldo = Math.max(0, Number(os.total||0) - _totalPagoOS(os));
+  window.__concluirIndex = i;
+  if(saldo<=0.009){
+    if(confirm(`Concluir este serviço?\n\nCliente: ${os.cliente||'-'}\nVeículo: ${os.veiculo||'-'} ${os.placa||'-'}\n\nO pagamento já está totalmente quitado. Ela será movida para Serviços Concluídos.`)){
+      _finalizarOS(i);
     }
-    os.statusServico = novoStatus;
-    renderOS(); renderFiados(); atualizarDashboard();
-    const ok = await salvarAgora();
-    if(!ok){
-      alert('ATENÇÃO: essa mudança de status NÃO foi salva no servidor (falha de conexão). Não feche o navegador — verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
-    }
-  }catch(e){
-    console.error('Erro ao alterar status do serviço:', e);
-    alert('ERRO ao alterar o status deste serviço — a mudança NÃO foi salva.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+    return;
   }
+  document.getElementById('concluirResumo').innerHTML = `<strong>${escapeHtml(os.cliente||'-')}</strong> — ${escapeHtml(os.veiculo||'-')} ${escapeHtml(os.placa||'-')}<br>Total: ${moeda(os.total)} · Saldo devedor: <strong>${moeda(saldo)}</strong>`;
+  modalConcluirOSOverlay.classList.add('aberto');
+}
+function fecharModalConcluirOS(){ modalConcluirOSOverlay.classList.remove('aberto'); }
+function escolherLancarPagamentoAoConcluir(){
+  const i = window.__concluirIndex;
+  fecharModalConcluirOS();
+  abrirLancarPagamentoOS(i);
+}
+async function escolherEnviarParaFiados(){
+  const i = window.__concluirIndex;
+  const os = serviceOrders[i]; if(!os)return;
+  fecharModalConcluirOS();
+  await _finalizarOS(i);
 }
 async function _finalizarOS(i){
   const o=serviceOrders[i]; if(!o)return;
@@ -2463,8 +2485,8 @@ function irParaMovimentacoesFinanceiro(){
   abrirFinanceiro('finMovimentacoes', btn);
 }
 function renderConcluidos(){
-  if(!document.getElementById('listaConcluidos'))return;
-  listaConcluidos.innerHTML='';
+  const cont=document.getElementById('listaConcluidos');
+  if(!cont)return;
   const termo = normalizarTextoBusca(document.getElementById('buscaConcluidos')?.value || '');
   const mesAtual = mesAtualISO();
   const lista = servicosConcluidos.filter(s=>{
@@ -2473,26 +2495,22 @@ function renderConcluidos(){
     return normalizarTextoBusca(s.cliente).includes(termo) || normalizarTextoBusca(s.placa).includes(termo) || normalizarTextoBusca(s.veiculo).includes(termo);
   });
   if(lista.length===0){
-    listaConcluidos.innerHTML='<tr><td colspan="9" class="muted">Nenhum serviço concluído neste mês ainda.</td></tr>';
+    cont.innerHTML='<p class="muted">Nenhum serviço concluído neste mês ainda.</p>';
     return;
   }
-  lista.forEach(s=>{
-    listaConcluidos.innerHTML += `<tr>
-      <td>${dataBR(s.data)}</td>
-      <td>${escapeHtml(s.cliente)}</td>
-      <td>${escapeHtml(s.veiculo||'-')}</td>
-      <td>${escapeHtml(s.placa||'-')}</td>
-      <td>${moeda(s.total)}</td>
-      <td>${_badgeStatusFinanceiro(_statusFinanceiroOS(s))}</td>
-      <td>${escapeHtml(s.forma||'-')}</td>
-      <td>${escapeHtml(s.funcionario||'-')}</td>
-      <td style="display:flex;gap:6px;flex-wrap:wrap">
+  cont.innerHTML = lista.map(s=>`<div class="client-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <strong>${escapeHtml(s.cliente)}</strong>
+        ${_badgeStatusFinanceiro(_statusFinanceiroOS(s))}
+      </div>
+      <small>${dataBR(s.data)} · ${escapeHtml(s.veiculo||'-')} · Placa ${escapeHtml(s.placa||'-')} · ${moeda(s.total)}</small><br>
+      <small class="muted">Forma: ${escapeHtml(s.forma||'-')} · Funcionário: ${escapeHtml(s.funcionario||'-')}</small>
+      <div class="actions">
         <button class="dark" onclick="gerarPDFConcluido(${s.id})">PDF</button>
         <button class="gray" onclick="reabrirParaOS(${s.id})">Reabrir p/ OS</button>
         <button class="red" onclick="reabrirParaOrcamento(${s.id})">Voltar p/ Orçamento</button>
-      </td>
-    </tr>`;
-  });
+      </div>
+    </div>`).join('');
 }
 
 /* ===== Reverter status da OS (corrigir lançamento por engano) ===== */
