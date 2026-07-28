@@ -17,6 +17,7 @@ button.dark{background:#111827;color:white}
 button.gray{background:#e5e7eb;color:#111827}
 button.red{background:#fee2e2;color:#991b1b}
 button.green{background:#dcfce7;color:#166534}
+button.orange{background:#ffedd5;color:#9a3412}
 .app{display:none}
 aside{position:fixed;top:0;bottom:0;left:0;width:280px;background:#111827;color:white;padding:20px;overflow:auto}
 .brand img{width:100%;background:#000;border-radius:12px;padding:8px;margin-bottom:10px}
@@ -289,23 +290,13 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 <section id="os" class="section">
   <div class="panel">
     <h3>Ordens de serviço aprovadas</h3>
-    <p class="muted">Vincule o funcionário responsável, lance pagamentos e conclua o serviço quando terminar.</p>
-    <div id="listaOS"></div>
+    <p class="muted">Vincule o funcionário responsável e lance o pagamento. Se pagar tudo, vai direto pra Serviços Concluídos; se não, você escolhe enviar para Fiados e Acordos.</p>
+    <table>
+      <thead><tr><th>Cliente</th><th>Valor</th><th>Funcionário</th><th>Ações</th></tr></thead>
+      <tbody id="listaOS"></tbody>
+    </table>
   </div>
 </section>
-
-<div class="cp-modal-overlay" id="modalConcluirOSOverlay">
-  <div class="cp-modal">
-    <h3>Concluir serviço</h3>
-    <div id="concluirResumo" class="muted" style="margin-bottom:12px"></div>
-    <p>Esta OS ainda não foi totalmente paga. O que deseja fazer?</p>
-    <div class="actions">
-      <button class="green" onclick="escolherLancarPagamentoAoConcluir()">Lançar pagamento</button>
-      <button class="dark" onclick="escolherEnviarParaFiados()">Enviar para Fiados e Acordos</button>
-      <button class="gray" onclick="fecharModalConcluirOS()">Cancelar</button>
-    </div>
-  </div>
-</div>
 
 <div class="cp-modal-overlay" id="modalPagamentoOSOverlay">
   <div class="cp-modal">
@@ -320,6 +311,15 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <div class="actions">
       <button class="gray" onclick="fecharModalPagamentoOS()">Cancelar</button>
       <button class="dark" onclick="confirmarPagamentoOS()">Confirmar pagamento</button>
+    </div>
+
+    <hr style="margin:16px 0;border:none;border-top:1px solid #e5e7eb">
+    <p class="muted" style="margin-bottom:8px">Ou, se o cliente não vai pagar tudo agora, envie direto pra Fiados e Acordos:</p>
+    <div class="grid2">
+      <div><label>Número de parcelas (opcional)</label><input id="opQtdParcelas" type="number" min="1" placeholder="Deixe em branco se for indefinido"></div>
+    </div>
+    <div class="actions">
+      <button class="orange" onclick="enviarParaFiadosComParcelas()">Enviar para Fiados e Acordos</button>
     </div>
   </div>
 </div>
@@ -2060,9 +2060,10 @@ function renderCobrancasConteudo(){
         <td>${p.pago?'-':`<button class="green" onclick="marcarParcelaAcordoPaga('${o.quoteId}','${p.id}')">Marcar como pago</button> <button class="red" onclick="excluirParcelaAcordo('${o.quoteId}','${p.id}')">Excluir</button>`}</td>
       </tr>`).join('') : '<tr><td colspan="4" class="muted">Nenhuma parcela cadastrada ainda.</td></tr>';
 
+    const combinacao = o.parcelasCombinadasQtd ? `Combinado em ${o.parcelasCombinadasQtd} parcela${o.parcelasCombinadasQtd>1?'s':''}` : 'Parcelas indefinidas';
     return `<div class="panel" style="margin-bottom:14px">
       <h4 style="margin-bottom:4px">OS #${escapeHtml(String(o.quoteId))} — ${escapeHtml(o.veiculo||'-')} ${escapeHtml(o.placa||'-')}</h4>
-      <small class="muted">Total: ${moeda(o.total)} · Saldo devedor: <strong>${moeda(saldo)}</strong>${faltaAgendar>0.009?(' · Falta agendar: '+moeda(faltaAgendar)):''}</small>
+      <small class="muted">Total: ${moeda(o.total)} · Saldo devedor: <strong>${moeda(saldo)}</strong>${faltaAgendar>0.009?(' · Falta agendar: '+moeda(faltaAgendar)):''} · ${combinacao}</small>
       <table style="margin-top:8px">
         <thead><tr><th>Data</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead>
         <tbody>${linhasParcelas}</tbody>
@@ -2214,32 +2215,30 @@ function renderOS(){
   const cont=document.getElementById('listaOS');
   if(!cont)return;
   if(serviceOrders.length===0){
-    cont.innerHTML='<p class="muted">Nenhuma ordem de serviço aprovada ainda.</p>';
+    cont.innerHTML='<tr><td colspan="4" class="muted">Nenhuma ordem de serviço aprovada ainda.</td></tr>';
     return;
   }
   cont.innerHTML = serviceOrders.map((o,i)=>{
-    const optionsFuncionarios = '<option value="">Funcionário responsável</option>' + funcionarios.map(f=>`<option value="${f.id}" ${String(o.funcionarioId||'')===String(f.id)?'selected':''}>${escapeHtml(f.nome)}</option>`).join('');
+    const optionsFuncionarios = '<option value="">Selecionar</option>' + funcionarios.map(f=>`<option value="${f.id}" ${String(o.funcionarioId||'')===String(f.id)?'selected':''}>${escapeHtml(f.nome)}</option>`).join('');
     const totalPago=_totalPagoOS(o);
     const saldo=Math.max(0, Number(o.total||0)-totalPago);
     const statusFin = _statusFinanceiroOS(o);
-    const listaPagamentos = (o.pagamentos||[]).length ? `<div style="margin-top:6px;font-size:11px" class="muted">` + o.pagamentos.map(p=>`${dataBR(p.data)} — ${moeda(p.valor)} (${escapeHtml(p.forma)}) <button class="red" style="padding:1px 5px;font-size:10px" onclick="excluirPagamentoOS(${i},'${p.id}')">x</button>`).join('<br>') + `</div>` : '';
-    return `<div class="client-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-        <strong>${escapeHtml(o.cliente)}</strong>
+    const listaPagamentos = (o.pagamentos||[]).length ? `<div style="margin-top:4px;font-size:11px" class="muted">` + o.pagamentos.map(p=>`${dataBR(p.data)} — ${moeda(p.valor)} (${escapeHtml(p.forma)}) <button class="red" style="padding:1px 5px;font-size:10px" onclick="excluirPagamentoOS(${i},'${p.id}')">x</button>`).join('<br>') + `</div>` : '';
+    return `<tr>
+      <td>
+        <strong>${escapeHtml(o.cliente)}</strong><br>
+        <small class="muted">${escapeHtml(o.veiculo||'-')} · Placa ${escapeHtml(o.placa||'-')}</small><br>
         ${_badgeStatusFinanceiro(statusFin)}
-      </div>
-      <small>${escapeHtml(o.veiculo||'-')} · Placa ${escapeHtml(o.placa||'-')} · Total ${moeda(o.total)}</small>
-      <div style="margin-top:8px"><select onchange="vincularFuncionarioOS(${i},this.value)">${optionsFuncionarios}</select></div>
-      <div style="font-size:12px;margin-top:6px"><strong>Pago: ${moeda(totalPago)}</strong> de ${moeda(o.total)} · Saldo: ${moeda(saldo)}</div>
-      ${listaPagamentos}
-      <div class="actions">
+        ${listaPagamentos}
+      </td>
+      <td>${moeda(o.total)}<br><small class="muted">Saldo: ${moeda(saldo)}</small></td>
+      <td><select onchange="vincularFuncionarioOS(${i},this.value)">${optionsFuncionarios}</select></td>
+      <td>
         <button class="green" onclick="abrirLancarPagamentoOS(${i})">Lançar pagamento</button>
-        <button class="dark" onclick="tentarConcluirOS(${i})">Concluir serviço</button>
-        <button class="gray" onclick="enviarCobrancaWhatsapp('${o.quoteId}')">Enviar Cobrança</button>
         <button class="gray" onclick="editarOrdemServico(${i})">Editar OS</button>
         <button class="red" onclick="voltarOrdemParaOrcamento(${i})">Voltar</button>
-      </div>
-    </div>`;
+      </td>
+    </tr>`;
   }).join('');
 }
 
@@ -2343,6 +2342,13 @@ async function confirmarPagamentoOS(){
 
     fecharModalPagamentoOS();
 
+    // se essa OS ainda está ativa (não veio de Fiados/Concluídos) e agora está totalmente
+    // paga, ela já vai sozinha pra Serviços Concluídos — sem precisar de um botão à parte.
+    if(achado.tipo==='os' && _totalPagoOS(os) >= Number(os.total||0) - 0.009){
+      await _finalizarOS(achado.index);
+      return;
+    }
+
     renderOS(); renderConcluidos(); renderFiados(); renderEntradas(); atualizarDashboard();
     const ok = await salvarAgora();
     if(!ok){
@@ -2363,29 +2369,21 @@ function excluirPagamentoOS(i, pagamentoId){
   os.pagamentos = (os.pagamentos||[]).filter(p=>String(p.id)!==String(pagamentoId));
   renderOS(); renderFiados(); renderEntradas(); atualizarDashboard(); salvarAgora();
 }
-function tentarConcluirOS(i){
-  const os = serviceOrders[i]; if(!os)return;
-  const saldo = Math.max(0, Number(os.total||0) - _totalPagoOS(os));
-  window.__concluirIndex = i;
-  if(saldo<=0.009){
-    if(confirm(`Concluir este serviço?\n\nCliente: ${os.cliente||'-'}\nVeículo: ${os.veiculo||'-'} ${os.placa||'-'}\n\nO pagamento já está totalmente quitado. Ela será movida para Serviços Concluídos.`)){
-      _finalizarOS(i);
-    }
-    return;
-  }
-  document.getElementById('concluirResumo').innerHTML = `<strong>${escapeHtml(os.cliente||'-')}</strong> — ${escapeHtml(os.veiculo||'-')} ${escapeHtml(os.placa||'-')}<br>Total: ${moeda(os.total)} · Saldo devedor: <strong>${moeda(saldo)}</strong>`;
-  modalConcluirOSOverlay.classList.add('aberto');
-}
-function fecharModalConcluirOS(){ modalConcluirOSOverlay.classList.remove('aberto'); }
-function escolherLancarPagamentoAoConcluir(){
-  const i = window.__concluirIndex;
-  fecharModalConcluirOS();
-  abrirLancarPagamentoOS(i);
-}
-async function escolherEnviarParaFiados(){
-  const i = window.__concluirIndex;
-  const os = serviceOrders[i]; if(!os)return;
-  fecharModalConcluirOS();
+async function enviarParaFiadosComParcelas(){
+  const quoteId=window.__pagamentoQuoteId;
+  const achado=_buscarRegistroPorQuoteId(quoteId); if(!achado)return;
+  if(achado.tipo!=='os'){ fecharModalPagamentoOS(); return; }
+  const i=achado.index;
+  const os=achado.obj;
+  const qtdInput=document.getElementById('opQtdParcelas');
+  const qtd = qtdInput && qtdInput.value ? Number(qtdInput.value) : null;
+  const saldo = Math.max(0, Number(os.total||0)-_totalPagoOS(os));
+  const msg = qtd
+    ? `Enviar esta OS para Fiados e Acordos, combinado em ${qtd} parcela${qtd>1?'s':''}?\n\nCliente: ${os.cliente||'-'}\nSaldo devedor: ${moeda(saldo)}`
+    : `Enviar esta OS para Fiados e Acordos, com parcelas indefinidas por enquanto?\n\nCliente: ${os.cliente||'-'}\nSaldo devedor: ${moeda(saldo)}`;
+  if(!confirm(msg)) return;
+  os.parcelasCombinadasQtd = qtd;
+  fecharModalPagamentoOS();
   await _finalizarOS(i);
 }
 async function _finalizarOS(i){
@@ -2410,7 +2408,9 @@ async function _finalizarOS(i){
       forma: formasUsadas.length===1 ? formasUsadas[0] : 'Múltiplas formas',
       funcionario: func ? func.nome : '',
       items:JSON.parse(JSON.stringify(o.items||[])),
-      pagamentos:JSON.parse(JSON.stringify(o.pagamentos||[]))
+      pagamentos:JSON.parse(JSON.stringify(o.pagamentos||[])),
+      parcelasAcordo:JSON.parse(JSON.stringify(o.parcelasAcordo||[])),
+      parcelasCombinadasQtd:o.parcelasCombinadasQtd||null
     });
 
     const q = quotes.find(x=>x.id===o.quoteId);
