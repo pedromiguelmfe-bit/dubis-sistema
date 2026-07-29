@@ -1288,7 +1288,11 @@ function abrirFinanceiro(id,btn){
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.finance-tabs button').forEach(b=>b.classList.remove('activeTab'));
   if(btn)btn.classList.add('activeTab');
-  renderFinanceiro(window.filtroAtual||'todos'); renderEntradas(); renderSaidas(); renderMovimentacoes(); renderCalendarioFinanceiro(); renderRelatorios(); atualizarResumoFinanceiro(window.filtroAtual||'todos');
+  // renderFinanceiro() já cascateia sozinha pra Entradas, Saídas, Movimentações,
+  // Calendário e Resumo — chamar essas telas de novo aqui só duplicava o trabalho
+  // (e deixava a troca de aba lenta). Só Relatórios não faz parte dessa cadeia.
+  renderFinanceiro(window.filtroAtual||'todos');
+  renderRelatorios();
 }
 
 function atualizarDashboard(){
