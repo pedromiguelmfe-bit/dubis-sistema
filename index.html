@@ -2047,14 +2047,11 @@ function _statusAcordo(os){
   return 'Em dia';
 }
 function _listaFiados(){
-  const lista=[];
-  serviceOrders.forEach(o=>{
-    if(Math.max(0, Number(o.total||0)-_totalPagoOS(o))>0.009) lista.push(o);
-  });
-  servicosConcluidos.forEach(s=>{
-    if(Math.max(0, Number(s.total||0)-_totalPagoOS(s))>0.009) lista.push(s);
-  });
-  return lista;
+  // Só entram aqui as Ordens de Serviço que foram explicitamente enviadas pra Fiados
+  // e Acordos (marcadas com enviadoParaFiados). Uma OS ainda ativa em "Ordens de
+  // Serviço" nunca aparece aqui, mesmo com saldo pendente — só quando você escolher
+  // enviar de propósito, o que já move ela pra Serviços Concluídos.
+  return servicosConcluidos.filter(s=>s.enviadoParaFiados && Math.max(0, Number(s.total||0)-_totalPagoOS(s))>0.009);
 }
 function renderFiados(){
   const cont=document.getElementById('listaFiados');
@@ -2510,6 +2507,7 @@ async function enviarParaFiadosComParcelas(){
     : `Enviar esta OS para Fiados e Acordos, com parcelas indefinidas por enquanto?\n\nCliente: ${os.cliente||'-'}\nSaldo devedor: ${moeda(saldo)}`;
   if(!confirm(msg)) return;
   os.parcelasCombinadasQtd = qtd;
+  os.enviadoParaFiados = true;
   fecharModalPagamentoOS();
   await _finalizarOS(i);
 }
@@ -2537,7 +2535,8 @@ async function _finalizarOS(i){
       items:JSON.parse(JSON.stringify(o.items||[])),
       pagamentos:JSON.parse(JSON.stringify(o.pagamentos||[])),
       parcelasAcordo:JSON.parse(JSON.stringify(o.parcelasAcordo||[])),
-      parcelasCombinadasQtd:o.parcelasCombinadasQtd||null
+      parcelasCombinadasQtd:o.parcelasCombinadasQtd||null,
+      enviadoParaFiados: o.enviadoParaFiados||false
     });
 
     const q = quotes.find(x=>x.id===o.quoteId);
