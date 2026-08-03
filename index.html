@@ -3357,11 +3357,10 @@ function adicionarMeses(dataISO, meses){
 }
 
 function gerarRelatorioMensal(){
-  const fim = new Date(dataHojeISO() + 'T00:00:00');
-  const inicio = new Date(fim);
-  inicio.setDate(inicio.getDate() - 30);
-  const inicioISO = inicio.toISOString().slice(0,10);
-  const fimISO = fim.toISOString().slice(0,10);
+  const mesRef = (window.mesSelecionadoFinanceiro && /^\d{4}-\d{2}$/.test(window.mesSelecionadoFinanceiro)) ? window.mesSelecionadoFinanceiro : mesAtualISO();
+  const [ano, mes] = mesRef.split('-').map(Number);
+  const inicioISO = mesRef+'-01';
+  const fimISO = mesRef+'-'+String(_ultimoDiaMes(ano,mes)).padStart(2,'0');
 
   const contasPeriodo = finance.filter(c => String(c.data||'').slice(0,10) >= inicioISO && String(c.data||'').slice(0,10) <= fimISO);
   const entradasPeriodo = entradas.filter(e => String(e.data||'').slice(0,10) >= inicioISO && String(e.data||'').slice(0,10) <= fimISO);
@@ -3372,7 +3371,10 @@ function gerarRelatorioMensal(){
   const totalAVencer = contasPeriodo.filter(c=>c.status==='A vencer').reduce((s,c)=>s+Number(c.valor||0),0);
   const totalEntradas = entradasPeriodo.reduce((s,e)=>s+Number(e.valor||0),0);
   const totalSaidas = saidasPeriodo.reduce((s,e)=>s+Number(e.valor||0),0);
-  const saldo = totalEntradas - totalPagas - totalSaidas;
+  // "Saídas" já inclui as contas pagas (toda conta marcada como paga também vira uma
+  // saída, com origem 'ContaPaga') — por isso o saldo NÃO pode subtrair as duas ao
+  // mesmo tempo, senão as contas pagas seriam contadas em dobro.
+  const saldo = totalEntradas - totalSaidas;
 
   const linhasContas = contasPeriodo.map(c=>`<tr><td>${dataBR(c.data)}</td><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.status)}</td><td>${moeda(c.valor)}</td></tr>`).join('');
   const linhasEntradas = entradasPeriodo.map(e=>`<tr><td>${dataBR(e.data)}</td><td>${escapeHtml(e.descricao)}</td><td>${escapeHtml(e.forma||'-')}</td><td>${moeda(e.valor)}</td></tr>`).join('');
