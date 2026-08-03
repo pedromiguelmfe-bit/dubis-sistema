@@ -444,15 +444,6 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     </div>
 
     
-    <div class="panel" style="box-shadow:none;border:1px dashed #d1d5db">
-      <h3>Importar boleto em PDF</h3>
-      <p class="muted">Envie um PDF de boleto. O sistema tenta ler vencimento e valor e preencher a conta automaticamente. Depois confira e clique em “Adicionar pagamento”.</p>
-      <div class="grid2">
-        <div><label>PDF do boleto</label><input id="boletoPdf" type="file" accept="application/pdf" onchange="processarBoletoPDF()"></div>
-        <div><label>Status da leitura</label><input id="statusLeituraBoleto" disabled placeholder="Nenhum PDF importado"></div><div style="display:flex;align-items:end"><button class="dark" onclick="aceitarBoletoPDF()">Aceitar boleto</button></div>
-      </div>
-    </div>
-
     <div class="panel">
       <h3>Cadastrar movimentação</h3>
       <p class="muted">Lance uma entrada, saída ou conta a pagar em um só lugar. Compras parceladas geram todas as parcelas automaticamente em Contas a Pagar.</p>
@@ -761,6 +752,23 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
         <div class="cp-meses-barra" id="mrMesesBarra"></div>
       </div>
 
+      <div class="cp-resumo">
+        <h4 id="mrResumoTitulo">Resultado do período</h4>
+        <div class="cp-resumo-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div><small>Total de entradas</small><div id="mrTotalEntradas">R$ 0,00</div></div>
+          <div><small>Total pago em contas</small><div id="mrTotalContasPagas">R$ 0,00</div></div>
+          <div><small>Total gasto com peças</small><div id="mrTotalPecas">R$ 0,00</div></div>
+        </div>
+        <div class="cp-resumo-grid" style="grid-template-columns:repeat(4,1fr);margin-top:10px">
+          <div><small>Total de saídas</small><div id="mrTotalSaidas">R$ 0,00</div></div>
+          <div><small>Recebido de serviços concluídos</small><div id="mrTotalServicos">R$ 0,00</div></div>
+          <div><small>Taxas e descontos</small><div id="mrTotalTaxas">R$ 0,00</div></div>
+          <div><small>Lucro bruto</small><div id="mrLucroBruto">R$ 0,00</div></div>
+          <div><small>Lucro líquido</small><div id="mrLucroLiquido">R$ 0,00</div></div>
+          <div><small>Saldo final</small><div id="mrSaldoFinal">R$ 0,00</div></div>
+        </div>
+      </div>
+
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 10px">
         <input id="mrBusca" class="inline-input" style="max-width:260px" placeholder="Buscar por descrição..." oninput="renderMovimentacoes()">
         <select id="mrFiltroTipo" class="inline-input" style="max-width:150px" onchange="renderMovimentacoes()"><option value="">Entradas e saídas</option><option value="Entrada">Só entradas</option><option value="Saída">Só saídas</option></select>
@@ -775,21 +783,6 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
         <thead><tr><th>Data</th><th style="min-width:220px">Descrição</th><th>Categoria</th><th>Tipo</th><th>Banco</th><th>Forma</th><th>Valor bruto</th><th>Valor líquido</th><th>Situação</th><th>Ação</th></tr></thead>
         <tbody id="listaMovimentacoes"></tbody>
       </table>
-
-      <div class="cp-resumo">
-        <h4 id="mrResumoTitulo">Resultado do período</h4>
-        <div class="cp-resumo-grid" style="grid-template-columns:repeat(3,1fr)">
-          <div><small>Total de entradas</small><div id="mrTotalEntradas">R$ 0,00</div></div>
-          <div><small>Total de saídas</small><div id="mrTotalSaidas">R$ 0,00</div></div>
-          <div><small>Total pago em contas</small><div id="mrTotalContasPagas">R$ 0,00</div></div>
-          <div><small>Total gasto com peças</small><div id="mrTotalPecas">R$ 0,00</div></div>
-          <div><small>Recebido de serviços concluídos</small><div id="mrTotalServicos">R$ 0,00</div></div>
-          <div><small>Taxas e descontos</small><div id="mrTotalTaxas">R$ 0,00</div></div>
-          <div><small>Lucro bruto</small><div id="mrLucroBruto">R$ 0,00</div></div>
-          <div><small>Lucro líquido</small><div id="mrLucroLiquido">R$ 0,00</div></div>
-          <div><small>Saldo final</small><div id="mrSaldoFinal">R$ 0,00</div></div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -3280,72 +3273,6 @@ function dataBRparaISO(data){
   const m = String(data||'').match(/(\d{2})\/(\d{2})\/(\d{4})/);
   if(!m) return '';
   return `${m[3]}-${m[2]}-${m[1]}`;
-}
-
-async function processarBoletoPDF(){
-  const arquivo = document.getElementById('boletoPdf')?.files?.[0];
-  if(!arquivo) return;
-
-  statusLeituraBoleto.value = 'Lendo PDF...';
-
-  try{
-    if(!window.pdfjsLib){
-      statusLeituraBoleto.value = 'Leitor PDF não carregou. Preencha manualmente.';
-      fDescricao.value = arquivo.name.replace(/\.pdf$/i,'');
-      return;
-    }
-
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-    const buffer = await arquivo.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({data: buffer}).promise;
-    let texto = '';
-
-    for(let pagina=1; pagina<=pdf.numPages; pagina++){
-      const page = await pdf.getPage(pagina);
-      const content = await page.getTextContent();
-      texto += ' ' + content.items.map(i=>i.str).join(' ');
-    }
-
-    const datas = [...texto.matchAll(/\b\d{2}\/\d{2}\/\d{4}\b/g)].map(m=>m[0]);
-    const valores = [...texto.matchAll(/R\$\s?[\d\.]+,\d{2}/g)].map(m=>m[0]);
-
-    let dataEscolhida = datas[0] || '';
-    const venc = texto.match(/(?:vencimento|vcto|data de vencimento).{0,60}?(\d{2}\/\d{2}\/\d{4})/i);
-    if(venc) dataEscolhida = venc[1];
-
-    let valorEscolhido = 0;
-    if(valores.length){
-      const nums = valores.map(v=>moedaParaNumeroBR(v)).filter(v=>v>0);
-      valorEscolhido = nums.length ? Math.max(...nums) : 0;
-    }
-
-    fTipo.value = 'Variável';
-    fStatus.value = 'A vencer';
-    fDescricao.value = 'Boleto PDF - ' + arquivo.name.replace(/\.pdf$/i,'');
-    if(dataEscolhida) fData.value = dataBRparaISO(dataEscolhida);
-    if(valorEscolhido) fValor.value = valorEscolhido.toFixed(2);
-
-    statusLeituraBoleto.value = `Encontrado: ${dataEscolhida || 'data não encontrada'} | ${valorEscolhido ? moeda(valorEscolhido) : 'valor não encontrado'}`;
-
-    if(!dataEscolhida || !valorEscolhido){
-      alert('Não consegui identificar tudo com segurança. Confira a data e o valor antes de salvar.');
-    }
-  } catch(e){
-    statusLeituraBoleto.value = 'Não foi possível ler o PDF. Preencha manualmente.';
-    fDescricao.value = 'Boleto PDF - ' + arquivo.name.replace(/\.pdf$/i,'');
-  }
-}
-
-
-function aceitarBoletoPDF(){
-  if(!fData.value || !fValor.value){
-    alert('Primeiro importe o boleto e confira se data e valor foram preenchidos.');
-    return;
-  }
-  salvarContaPagar();
-  if(document.getElementById('boletoPdf')) boletoPdf.value='';
-  if(document.getElementById('statusLeituraBoleto')) statusLeituraBoleto.value='Boleto aceito e lançado nas contas a pagar.';
 }
 
 function adicionarMeses(dataISO, meses){
