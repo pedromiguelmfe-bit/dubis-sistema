@@ -3504,7 +3504,8 @@ function renderFornecedores(){
       <div class="os-linha-info"><span>Já pago</span><strong>${moeda(totalPago)}</strong></div>
       <div class="os-linha-info"><span>Próximo vencimento</span><strong>${proxima?dataBR(proxima.data):'-'}</strong></div>
       <div class="os-card-acoes">
-        <button class="dark" onclick="abrirDetalhesFornecedor('${g.nome.replace(/'/g,"\\'")}')">Ver contas</button>
+        <button class="green" onclick="abrirNovaContaComFornecedor('${g.nome.replace(/'/g,"\\'")}')">+ Adicionar Conta</button>
+        <button class="dark" onclick="abrirDetalhesFornecedor('${g.nome.replace(/'/g,"\\'")}')">Detalhes</button>
       </div>
     </div>`;
   }).join('');
