@@ -547,7 +547,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       </div>
 
       <table class="finance-table">
-        <thead><tr><th>Vencimento</th><th style="min-width:280px">Descrição</th><th>Tipo</th><th>Valor</th><th>Status</th><th>Parcela</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Vencimento</th><th style="min-width:280px">Descrição</th><th>Fornecedor</th><th>Tipo</th><th>Valor</th><th>Status</th><th>Parcela</th><th>Ação</th></tr></thead>
         <tbody id="listaContasPagar"></tbody>
       </table>
 
@@ -3659,6 +3659,7 @@ function _linhaContaHtml(c,i){
   return `<tr class="${classe}">
       <td><input class="inline-input" type="date" value="${c.data||''}" onchange="alterarCampoConta(${i},'data',this.value)"></td>
       <td><input class="inline-input desc-input" value="${escapeHtml(c.descricao)}" onchange="alterarCampoConta(${i},'descricao',this.value)"></td>
+      <td><input class="inline-input" placeholder="Ex: VIP" value="${escapeHtml(c.fornecedor||'')}" onchange="alterarCampoConta(${i},'fornecedor',this.value)"></td>
       <td><select onchange="alterarCampoConta(${i},'tipo',this.value)"><option ${c.tipo==='Mensal'?'selected':''}>Mensal</option><option ${c.tipo==='Variável'?'selected':''}>Variável</option><option ${c.tipo==='Semanal'?'selected':''}>Semanal</option></select></td>
       <td><div class="valor-wrap"><span>R$</span><input class="inline-input" type="number" step="0.01" value="${Number(c.valor||0).toFixed(2)}" onchange="alterarCampoConta(${i},'valor',this.value)"></div></td>
       <td>
@@ -3673,6 +3674,7 @@ function _linhaEntradaResumoHtml(e){
   return `<tr class="status-pago">
       <td>${dataBR(e.data)}</td>
       <td>${escapeHtml(e.descricao||'')}</td>
+      <td>-</td>
       <td><span class="badge green">Entrada</span></td>
       <td>${moeda(e.valorLiquido!=null?e.valorLiquido:e.valor)}</td>
       <td><span class="badge green">${escapeHtml(e.situacao||'Recebido')}</span></td>
@@ -3684,6 +3686,7 @@ function _linhaSaidaResumoHtml(s){
   return `<tr class="status-vencido">
       <td>${dataBR(s.data)}</td>
       <td>${escapeHtml(s.descricao||'')}</td>
+      <td>-</td>
       <td><span class="badge red">Saída</span></td>
       <td>${moeda(s.valor)}</td>
       <td><span class="badge red">Realizada</span></td>
@@ -3797,7 +3800,7 @@ function renderFinanceiro(){
 
   listaContasPagar.innerHTML='';
   if(itensVisiveis.length===0){
-    listaContasPagar.innerHTML='<tr><td colspan="7" class="muted">Nenhum lançamento encontrado para esse filtro.</td></tr>';
+    listaContasPagar.innerHTML='<tr><td colspan="8" class="muted">Nenhum lançamento encontrado para esse filtro.</td></tr>';
   } else if(modoAntigas){
     let grupoAtual=null;
     itensVisiveis.forEach(it=>{
@@ -3805,7 +3808,7 @@ function renderFinanceiro(){
       if(mesC!==grupoAtual){
         grupoAtual=mesC;
         const lbl=_mesLabelPt(mesC);
-        listaContasPagar.innerHTML += `<tr><td colspan="7" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
+        listaContasPagar.innerHTML += `<tr><td colspan="8" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
       }
       listaContasPagar.innerHTML += linhaDoItem(it);
     });
@@ -3816,6 +3819,7 @@ function renderFinanceiro(){
   renderEntradas();
   renderSaidas();
   atualizarResumoFinanceiro('todos');
+  if(typeof renderFornecedores==='function') renderFornecedores();
   salvarDados();
 }
 /* ===== Cadastrar Movimentação unificada (Fase A) ===== */
