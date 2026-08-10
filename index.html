@@ -547,7 +547,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       </div>
 
       <table class="finance-table">
-        <thead><tr><th>Vencimento</th><th style="min-width:280px">Descrição</th><th>Fornecedor</th><th>Tipo</th><th>Valor</th><th>Status</th><th>Parcela</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Vencimento</th><th style="min-width:280px">Descrição</th><th>Tipo</th><th>Valor</th><th>Status</th><th>Parcela</th><th>Ação</th></tr></thead>
         <tbody id="listaContasPagar"></tbody>
       </table>
 
@@ -901,8 +901,13 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 </section>
 <section id="fornecedores" class="section">
   <div class="panel">
-    <h3>Fornecedores</h3>
-    <p class="muted">Cada fornecedor vira um quadrinho, igual à planilha: data de vencimento, descrição e valor, linha por linha, com o total somado sozinho. Continua contando normalmente nos totais do Financeiro.</p>
+    <div class="cp-topo">
+      <div>
+        <h3>Fornecedores</h3>
+        <p class="muted">Cada fornecedor vira um quadrinho com o total da dívida, parcelas e vencimentos — igual ao Fiados e Acordos. Continua contando normalmente nos totais do Financeiro.</p>
+      </div>
+      <button class="btn-nova" onclick="abrirNovaDividaFornecedor()">+ Nova Conta de Fornecedor</button>
+    </div>
     <input id="fornBusca" class="inline-input" style="max-width:280px;margin-bottom:14px" placeholder="Buscar fornecedor..." oninput="renderFornecedores()">
     <div id="listaFornecedores" class="os-grid"></div>
   </div>
@@ -914,6 +919,25 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <div id="fornecedorConteudo"></div>
     <div class="actions">
       <button class="gray" onclick="fecharModalFornecedor()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="cp-modal-overlay" id="modalNovaDividaOverlay">
+  <div class="cp-modal">
+    <h3>Nova Conta de Fornecedor</h3>
+    <div class="grid2">
+      <div><label>Fornecedor</label><input id="ndfFornecedor" placeholder="Ex: VIP"></div>
+      <div><label>Descrição da compra</label><input id="ndfDescricao" placeholder="Ex: Pneus, boleto, peças..."></div>
+      <div><label>Valor total</label><input id="ndfValorTotal" type="number" step="0.01"></div>
+      <div><label>Quantidade de parcelas</label><input id="ndfQtdParcelas" type="number" min="1" value="1"></div>
+      <div><label>Vencimento da 1ª parcela</label><input id="ndfPrimeiroVencimento" type="date"></div>
+      <div style="grid-column:1/-1"><label>Observações (opcional)</label><input id="ndfObs" placeholder="Opcional"></div>
+    </div>
+    <p class="muted" style="margin-top:6px">As parcelas seguintes são geradas automaticamente, uma por mês a partir da primeira — depois dá pra ajustar cada data e valor em "Detalhes".</p>
+    <div class="actions">
+      <button class="gray" onclick="fecharModalNovaDivida()">Cancelar</button>
+      <button class="dark" onclick="salvarNovaDividaFornecedor()">Salvar</button>
     </div>
   </div>
 </div>
@@ -1048,6 +1072,7 @@ let recorrentes=[];
 let estoque=[];
 let saidas=[];
 let entradas=[];
+let dividasFornecedores=[];
 let currentItems=[], editingQuoteId=null, editingClientId=null, editingFuncId=null;
 
 const ddaItauImportado = [];
@@ -1108,6 +1133,7 @@ async function carregarDadosSalvos(){
     if(usar.servicosConcluidos) servicosConcluidos = usar.servicosConcluidos;
     if(usar.entradas) entradas = usar.entradas;
     if(usar.saidas) saidas = usar.saidas;
+    if(usar.dividasFornecedores) dividasFornecedores = usar.dividasFornecedores;
   } else if(supaOk && !supaDados){
     await enviarParaSupabase(); // nada no servidor: grava o estado atual (vazio) como inicial
   }
@@ -1115,7 +1141,7 @@ async function carregarDadosSalvos(){
 
 /* ===== Salvamento com aviso visível + cópia de segurança local ===== */
 function _coletarDados(){
-  return {quotes, serviceOrders, clients, finance, entradas, saidas, funcionarios, servicosConcluidos, recorrentes, estoque};
+  return {quotes, serviceOrders, clients, finance, entradas, saidas, funcionarios, servicosConcluidos, recorrentes, estoque, dividasFornecedores};
 }
 function _salvarBackupLocal(dados, ts){
   try{ localStorage.setItem('dubis_backup', JSON.stringify({dados, ts})); }catch(e){}
@@ -3464,14 +3490,30 @@ function excluirConta(i){
   if(typeof renderFornecedores==='function') renderFornecedores();
   salvarAgora();
 }
+function _statusDivida(divida){
+  const pendentes=(divida.parcelas||[]).filter(p=>!p.pago);
+  if(!pendentes.length) return 'Quitado';
+  const prox=[...pendentes].sort((a,b)=>String(a.data).localeCompare(String(b.data)))[0];
+  const dias=_diasAteVencimento(prox.data);
+  if(dias<0) return 'Vencido';
+  if(dias===0) return 'Vence hoje';
+  if(dias<=7) return 'Próximo do vencimento';
+  return 'Em dia';
+}
+function _proximaParcelaFornecedorPendente(divida){
+  const pendentes=(divida.parcelas||[]).filter(p=>!p.pago);
+  if(!pendentes.length) return null;
+  return [...pendentes].sort((a,b)=>String(a.data).localeCompare(String(b.data)))[0];
+}
+function _totalPagoDivida(divida){ return (divida.parcelas||[]).filter(p=>p.pago).reduce((s,p)=>s+Number(p.valor||0),0); }
 function _agruparPorFornecedor(){
   const grupos={};
   const ordem=[];
-  finance.forEach((c,i)=>{
-    const nome=(c.fornecedor||'').trim();
+  dividasFornecedores.forEach(d=>{
+    const nome=(d.fornecedor||'').trim();
     if(!nome) return;
-    if(!grupos[nome]){ grupos[nome]={nome, contas:[]}; ordem.push(nome); }
-    grupos[nome].contas.push({...c, _index:i});
+    if(!grupos[nome]){ grupos[nome]={nome, dividas:[]}; ordem.push(nome); }
+    grupos[nome].dividas.push(d);
   });
   ordem.sort((a,b)=>a.localeCompare(b));
   return ordem.map(n=>grupos[n]);
@@ -3486,25 +3528,33 @@ function renderFornecedores(){
 
   if(grupos.length===0){
     cont.innerHTML = todos.length===0
-      ? '<div class="os-vazio">Nenhuma conta com o campo "Fornecedor" preenchido ainda. Ao cadastrar ou editar uma conta em Pagamentos, preencha esse campo pra ela aparecer agrupada aqui.</div>'
+      ? '<div class="os-vazio">Nenhuma dívida de fornecedor cadastrada ainda. Clique em "+ Nova Conta de Fornecedor" pra começar.</div>'
       : '<div class="os-vazio">Nenhum fornecedor encontrado para essa busca.</div>';
     return;
   }
   cont.innerHTML = grupos.map(g=>{
-    const pendentes = g.contas.filter(c=>c.status!=='Pago');
-    const totalPendente = pendentes.reduce((s,c)=>s+Number(c.valor||0),0);
-    const totalPago = g.contas.filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
-    const proxima = [...pendentes].sort((a,b)=>String(a.data).localeCompare(String(b.data)))[0];
+    const valorTotal = g.dividas.reduce((s,d)=>s+Number(d.valorTotal||0),0);
+    const totalPago = g.dividas.reduce((s,d)=>s+_totalPagoDivida(d),0);
+    const saldo = Math.max(0, valorTotal-totalPago);
+    const proximas = g.dividas.map(d=>_proximaParcelaFornecedorPendente(d)).filter(Boolean);
+    const proxima = proximas.length ? [...proximas].sort((a,b)=>String(a.data).localeCompare(String(b.data)))[0] : null;
+    const statusList = g.dividas.map(_statusDivida);
+    const st = statusList.includes('Vencido') ? 'Vencido' : statusList.includes('Vence hoje') ? 'Vence hoje' : statusList.every(s=>s==='Quitado') ? 'Quitado' : 'Em dia';
+    const corBadge = st==='Vencido'?'red':st==='Vence hoje'?'orange':st==='Quitado'?'green':'';
+    const pct = valorTotal>0 ? Math.min(100, Math.round((totalPago/valorTotal)*100)) : 0;
     return `<div class="os-card">
       <div class="os-card-top">
         <div class="os-cliente-nome">${escapeHtml(g.nome)}</div>
-        <span class="badge ${pendentes.length?'orange':'green'}">${pendentes.length} pendente${pendentes.length!==1?'s':''}</span>
+        <span class="badge ${corBadge}">${st}</span>
       </div>
-      <div class="os-linha-info"><span>Total em aberto</span><strong>${moeda(totalPendente)}</strong></div>
+      <div class="os-linha-info"><span>Valor total</span><strong>${moeda(valorTotal)}</strong></div>
       <div class="os-linha-info"><span>Já pago</span><strong>${moeda(totalPago)}</strong></div>
+      <div class="os-linha-info"><span>Saldo restante</span><strong>${moeda(saldo)}</strong></div>
       <div class="os-linha-info"><span>Próximo vencimento</span><strong>${proxima?dataBR(proxima.data):'-'}</strong></div>
+      <div class="os-progress-bar"><div class="os-progress-fill" style="width:${pct}%"></div></div>
+      <div class="os-progress-label">${pct}% pago</div>
       <div class="os-card-acoes">
-        <button class="green" onclick="abrirNovaContaComFornecedor('${g.nome.replace(/'/g,"\\'")}')">+ Adicionar Conta</button>
+        <button class="green" onclick="abrirNovaDividaFornecedor('${g.nome.replace(/'/g,"\\'")}')">+ Nova Conta</button>
         <button class="dark" onclick="abrirDetalhesFornecedor('${g.nome.replace(/'/g,"\\'")}')">Detalhes</button>
       </div>
     </div>`;
@@ -3521,44 +3571,171 @@ function renderFornecedorConteudo(){
   const nome=window.__fornecedorAtual;
   const cont=document.getElementById('fornecedorConteudo');
   if(!cont)return;
-  const contas = finance.map((c,i)=>({...c,_index:i})).filter(c=>(c.fornecedor||'').trim()===nome);
-  const pendentes = contas.filter(c=>c.status!=='Pago');
-  const totalPendente = pendentes.reduce((s,c)=>s+Number(c.valor||0),0);
-  const totalPago = contas.filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
-  const ordenadas=[...contas].sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+  const dividas = dividasFornecedores.filter(d=>(d.fornecedor||'').trim()===nome);
+  const valorTotal = dividas.reduce((s,d)=>s+Number(d.valorTotal||0),0);
+  const totalPago = dividas.reduce((s,d)=>s+_totalPagoDivida(d),0);
+  const saldo = Math.max(0, valorTotal-totalPago);
+  const pct = valorTotal>0 ? Math.min(100, Math.round((totalPago/valorTotal)*100)) : 0;
+
+  const blocosDividas = dividas.length ? dividas.map(d=>{
+    const parcelas=[...(d.parcelas||[])].sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+    const pagoDivida=_totalPagoDivida(d);
+    const linhas = parcelas.length ? parcelas.map((p,idx)=>`
+      <tr>
+        <td>${idx+1} de ${parcelas.length}</td>
+        <td>${dataBR(p.data)}</td>
+        <td>${moeda(p.valor)}</td>
+        <td>${p.pago?'<span class="badge green">Paga</span>':(_diasAteVencimento(p.data)<0?'<span class="badge red">Atrasada</span>':'<span class="badge orange">Pendente</span>')}</td>
+        <td>${p.pago?dataBR(p.dataPagamento||p.data):'-'}</td>
+        <td>${p.pago?'-':`<button class="green" onclick="marcarParcelaFornecedorPaga('${d.id}','${p.id}')">Confirmar pagamento</button> <button class="red" onclick="excluirParcelaFornecedor('${d.id}','${p.id}')">Excluir</button>`}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="muted">Nenhuma parcela cadastrada.</td></tr>';
+    return `<div class="panel" style="margin-bottom:14px;box-shadow:none;border:1px solid #eef0f3">
+      <h4 style="margin-bottom:2px">${escapeHtml(d.descricao||'Sem descrição')}</h4>
+      <small class="muted">Total: ${moeda(d.valorTotal)} · Pago: ${moeda(pagoDivida)} · Saldo: ${moeda(Math.max(0,Number(d.valorTotal||0)-pagoDivida))}${d.obs?(' · Obs: '+escapeHtml(d.obs)):''}</small>
+      <table style="margin-top:8px">
+        <thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Situação</th><th>Pago em</th><th>Ação</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+      <div style="display:flex;gap:8px;align-items:end;margin-top:10px;flex-wrap:wrap">
+        <div><label style="font-size:11px">Data da parcela</label><input type="date" id="novaParcelaFornData_${d.id}" value="${dataHojeISO()}"></div>
+        <div><label style="font-size:11px">Valor</label><input type="number" step="0.01" id="novaParcelaFornValor_${d.id}" style="max-width:120px"></div>
+        <button class="gray" onclick="adicionarParcelaFornecedor('${d.id}')">+ Adicionar parcela</button>
+        <button class="red" style="margin-left:auto" onclick="excluirDividaFornecedor('${d.id}')">Excluir conta inteira</button>
+      </div>
+    </div>`;
+  }).join('') : '<p class="muted">Nenhuma conta cadastrada pra esse fornecedor ainda.</p>';
 
   cont.innerHTML = `
     <div class="os-modal-stats">
-      <div class="os-modal-stat"><small>Em aberto</small><strong>${moeda(totalPendente)}</strong></div>
+      <div class="os-modal-stat"><small>Valor total</small><strong>${moeda(valorTotal)}</strong></div>
       <div class="os-modal-stat"><small>Já pago</small><strong>${moeda(totalPago)}</strong></div>
-      <div class="os-modal-stat"><small>Total de contas</small><strong>${contas.length}</strong></div>
+      <div class="os-modal-stat"><small>Saldo restante</small><strong>${moeda(saldo)}</strong></div>
+      <div class="os-modal-stat"><small>% pago</small><strong>${pct}%</strong></div>
     </div>
-    <table>
-      <thead><tr><th>Vencimento</th><th>Descrição</th><th>Parcela</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead>
-      <tbody>
-        ${ordenadas.length ? ordenadas.map(c=>`<tr>
-          <td>${dataBR(c.data)}</td>
-          <td>${escapeHtml(c.descricao||'-')}</td>
-          <td>${c.parcelaAtual?escapeHtml(String(c.parcelaAtual))+(c.totalParcelas?'/'+escapeHtml(String(c.totalParcelas)):''):'-'}</td>
-          <td>${moeda(c.valor)}</td>
-          <td>${c.status==='Pago'?'<span class="badge green">Pago</span>':'<span class="badge orange">Pendente</span>'}</td>
-          <td>
-            ${c.status!=='Pago'?`<button class="green" onclick="marcarContaPaga(${c._index})">Pagar</button>`:''}
-            <button class="gray" onclick="fecharModalFornecedor();editarConta(${c._index})">Editar</button>
-            <button class="red" onclick="excluirConta(${c._index});renderFornecedorConteudo()">Excluir</button>
-          </td>
-        </tr>`).join('') : '<tr><td colspan="6" class="muted">Nenhuma conta ainda.</td></tr>'}
-      </tbody>
-    </table>
-    <div class="actions" style="margin-top:12px">
-      <button class="dark" onclick="abrirNovaContaComFornecedor('${nome.replace(/'/g,"\\'")}')">+ Adicionar nova conta pra ${escapeHtml(nome)}</button>
+    <div class="os-progress-bar"><div class="os-progress-fill" style="width:${pct}%"></div></div>
+    <h4 style="margin:16px 0 6px">Contas deste fornecedor</h4>
+    ${blocosDividas}
+    <div class="actions" style="margin-top:6px">
+      <button class="dark" onclick="abrirNovaDividaFornecedor('${nome.replace(/'/g,"\\'")}')">+ Nova conta pra ${escapeHtml(nome)}</button>
     </div>
   `;
 }
-function abrirNovaContaComFornecedor(nome){
+function abrirNovaDividaFornecedor(nomePreenchido){
   fecharModalFornecedor();
-  abrirNovaConta();
-  mcFornecedor.value = nome;
+  document.getElementById('ndfFornecedor').value = nomePreenchido||'';
+  document.getElementById('ndfDescricao').value = '';
+  document.getElementById('ndfValorTotal').value = '';
+  document.getElementById('ndfQtdParcelas').value = '1';
+  document.getElementById('ndfPrimeiroVencimento').value = dataHojeISO();
+  document.getElementById('ndfObs').value = '';
+  modalNovaDividaOverlay.classList.add('aberto');
+}
+function fecharModalNovaDivida(){ modalNovaDividaOverlay.classList.remove('aberto'); }
+async function salvarNovaDividaFornecedor(){
+  const fornecedor = document.getElementById('ndfFornecedor').value.trim();
+  const descricao = document.getElementById('ndfDescricao').value.trim();
+  const valorTotal = Number(document.getElementById('ndfValorTotal').value||0);
+  const qtdParcelas = Math.max(1, Number(document.getElementById('ndfQtdParcelas').value||1));
+  const primeiroVencimento = document.getElementById('ndfPrimeiroVencimento').value;
+  const obs = document.getElementById('ndfObs').value.trim();
+
+  if(!fornecedor){ alert('Informe o nome do fornecedor.'); return; }
+  if(!descricao){ alert('Informe a descrição da compra.'); return; }
+  if(!valorTotal || valorTotal<=0){ alert('Informe o valor total da conta.'); return; }
+  if(!primeiroVencimento){ alert('Informe o vencimento da 1ª parcela.'); return; }
+
+  try{
+    const valorParcela = Math.floor((valorTotal/qtdParcelas)*100)/100;
+    const parcelas=[];
+    let somaGerada=0;
+    for(let p=0;p<qtdParcelas;p++){
+      const dt=new Date(primeiroVencimento+'T00:00:00');
+      dt.setMonth(dt.getMonth()+p);
+      const valorEssaParcela = (p===qtdParcelas-1) ? Math.round((valorTotal-somaGerada)*100)/100 : valorParcela;
+      somaGerada += valorEssaParcela;
+      parcelas.push({id:Date.now()+p+Math.floor(Math.random()*1000), data:dt.toISOString().slice(0,10), valor:valorEssaParcela, pago:false, dataPagamento:null, saidaId:null});
+    }
+    dividasFornecedores.push({id:'df'+Date.now()+Math.floor(Math.random()*100000), fornecedor, descricao, valorTotal, obs, criadoEm:dataHojeISO(), parcelas});
+    fecharModalNovaDivida();
+    renderFornecedores();
+    atualizarDashboard();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: essa conta NÃO foi salva no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+    }
+  }catch(e){
+    console.error('Erro ao salvar conta de fornecedor:', e);
+    alert('ERRO ao salvar esta conta.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
+}
+async function adicionarParcelaFornecedor(dividaId){
+  const d = dividasFornecedores.find(x=>String(x.id)===String(dividaId)); if(!d)return;
+  const dataInput=document.getElementById('novaParcelaFornData_'+dividaId);
+  const valorInput=document.getElementById('novaParcelaFornValor_'+dividaId);
+  const data=dataInput?dataInput.value:'';
+  const valor=Number(valorInput?valorInput.value:0);
+  if(!data){alert('Informe a data da parcela.');return}
+  if(!valor||valor<=0){alert('Informe o valor da parcela.');return}
+  try{
+    if(!d.parcelas) d.parcelas=[];
+    d.parcelas.push({id:Date.now()+Math.floor(Math.random()*100000), data, valor, pago:false, dataPagamento:null, saidaId:null});
+    renderFornecedorConteudo();
+    const ok = await salvarAgora();
+    if(!ok){ alert('ATENÇÃO: essa parcela NÃO foi salva no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento); }
+  }catch(e){
+    console.error('Erro ao adicionar parcela de fornecedor:', e);
+    alert('ERRO ao adicionar esta parcela.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
+}
+async function excluirParcelaFornecedor(dividaId, parcelaId){
+  const d = dividasFornecedores.find(x=>String(x.id)===String(dividaId)); if(!d)return;
+  if(!confirm('Excluir esta parcela? Isso não afeta pagamentos já lançados no Financeiro.'))return;
+  try{
+    d.parcelas = (d.parcelas||[]).filter(p=>String(p.id)!==String(parcelaId));
+    renderFornecedorConteudo();
+    const ok = await salvarAgora();
+    if(!ok){ alert('ATENÇÃO: essa exclusão NÃO foi salva no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento); }
+  }catch(e){
+    console.error('Erro ao excluir parcela de fornecedor:', e);
+    alert('ERRO ao excluir esta parcela.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
+}
+async function excluirDividaFornecedor(dividaId){
+  if(!confirm('Excluir esta conta inteira, com todas as parcelas? Parcelas já pagas continuam no histórico do Financeiro, só saem daqui.'))return;
+  try{
+    dividasFornecedores = dividasFornecedores.filter(d=>String(d.id)!==String(dividaId));
+    renderFornecedorConteudo();
+    renderFornecedores();
+    const ok = await salvarAgora();
+    if(!ok){ alert('ATENÇÃO: essa exclusão NÃO foi salva no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento); }
+  }catch(e){
+    console.error('Erro ao excluir conta de fornecedor:', e);
+    alert('ERRO ao excluir esta conta.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
+}
+async function marcarParcelaFornecedorPaga(dividaId, parcelaId){
+  const d = dividasFornecedores.find(x=>String(x.id)===String(dividaId)); if(!d)return;
+  const parcela = (d.parcelas||[]).find(p=>String(p.id)===String(parcelaId));
+  if(!parcela || parcela.pago) return;
+  if(!confirm(`Confirmar pagamento desta parcela de ${moeda(parcela.valor)} (${dataBR(parcela.data)})?\n\nIsso vai lançar uma saída no Financeiro, nessa mesma data.`)) return;
+  try{
+    const saidaId=Date.now()+Math.floor(Math.random()*100000);
+    saidas.push({id:saidaId, data:parcela.data, descricao:'Fornecedor: '+d.fornecedor+' - '+(d.descricao||''), categoria:'Fornecedor', valor:parcela.valor, formaPagamento:'', origem:'DividaFornecedor', dividaId:d.id});
+    parcela.pago=true;
+    parcela.dataPagamento=parcela.data;
+    parcela.saidaId=saidaId;
+
+    renderFornecedorConteudo(); renderSaidas(); renderMovimentacoes(); atualizarDashboard();
+    const ok = await salvarAgora();
+    if(!ok){
+      alert('ATENÇÃO: esse pagamento NÃO foi salvo no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
+      return;
+    }
+    renderFornecedores();
+  }catch(e){
+    console.error('Erro ao confirmar pagamento de parcela do fornecedor:', e);
+    alert('ERRO ao confirmar este pagamento.\n\nPor favor, tire um print desta mensagem e envie para o suporte.\n\nDetalhe técnico: '+(e && e.message ? e.message : String(e)));
+  }
 }
 function mesAtualISO(){ return dataHojeISO().slice(0,7); }
 function filtrarFinanceiro(valor){
@@ -3659,7 +3836,6 @@ function _linhaContaHtml(c,i){
   return `<tr class="${classe}">
       <td><input class="inline-input" type="date" value="${c.data||''}" onchange="alterarCampoConta(${i},'data',this.value)"></td>
       <td><input class="inline-input desc-input" value="${escapeHtml(c.descricao)}" onchange="alterarCampoConta(${i},'descricao',this.value)"></td>
-      <td><input class="inline-input" placeholder="Ex: VIP" value="${escapeHtml(c.fornecedor||'')}" onchange="alterarCampoConta(${i},'fornecedor',this.value)"></td>
       <td><select onchange="alterarCampoConta(${i},'tipo',this.value)"><option ${c.tipo==='Mensal'?'selected':''}>Mensal</option><option ${c.tipo==='Variável'?'selected':''}>Variável</option><option ${c.tipo==='Semanal'?'selected':''}>Semanal</option></select></td>
       <td><div class="valor-wrap"><span>R$</span><input class="inline-input" type="number" step="0.01" value="${Number(c.valor||0).toFixed(2)}" onchange="alterarCampoConta(${i},'valor',this.value)"></div></td>
       <td>
@@ -3674,7 +3850,6 @@ function _linhaEntradaResumoHtml(e){
   return `<tr class="status-pago">
       <td>${dataBR(e.data)}</td>
       <td>${escapeHtml(e.descricao||'')}</td>
-      <td>-</td>
       <td><span class="badge green">Entrada</span></td>
       <td>${moeda(e.valorLiquido!=null?e.valorLiquido:e.valor)}</td>
       <td><span class="badge green">${escapeHtml(e.situacao||'Recebido')}</span></td>
@@ -3686,7 +3861,6 @@ function _linhaSaidaResumoHtml(s){
   return `<tr class="status-vencido">
       <td>${dataBR(s.data)}</td>
       <td>${escapeHtml(s.descricao||'')}</td>
-      <td>-</td>
       <td><span class="badge red">Saída</span></td>
       <td>${moeda(s.valor)}</td>
       <td><span class="badge red">Realizada</span></td>
@@ -3800,7 +3974,7 @@ function renderFinanceiro(){
 
   listaContasPagar.innerHTML='';
   if(itensVisiveis.length===0){
-    listaContasPagar.innerHTML='<tr><td colspan="8" class="muted">Nenhum lançamento encontrado para esse filtro.</td></tr>';
+    listaContasPagar.innerHTML='<tr><td colspan="7" class="muted">Nenhum lançamento encontrado para esse filtro.</td></tr>';
   } else if(modoAntigas){
     let grupoAtual=null;
     itensVisiveis.forEach(it=>{
@@ -3808,7 +3982,7 @@ function renderFinanceiro(){
       if(mesC!==grupoAtual){
         grupoAtual=mesC;
         const lbl=_mesLabelPt(mesC);
-        listaContasPagar.innerHTML += `<tr><td colspan="8" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
+        listaContasPagar.innerHTML += `<tr><td colspan="7" class="mes-sep">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</td></tr>`;
       }
       listaContasPagar.innerHTML += linhaDoItem(it);
     });
@@ -3819,7 +3993,6 @@ function renderFinanceiro(){
   renderEntradas();
   renderSaidas();
   atualizarResumoFinanceiro('todos');
-  if(typeof renderFornecedores==='function') renderFornecedores();
   salvarDados();
 }
 /* ===== Cadastrar Movimentação unificada (Fase A) ===== */
