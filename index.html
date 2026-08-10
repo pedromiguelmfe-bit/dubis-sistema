@@ -427,6 +427,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <div class="finance-tabs">
       <button class="activeTab" onclick="abrirFinanceiro('finResumo', this)">Resumo</button>
       <button onclick="abrirFinanceiro('finPagamentos', this)">Pagamentos</button>
+      <button onclick="abrirFinanceiro('finFornecedores', this)">Fornecedores</button>
       <button onclick="abrirFinanceiro('finEntradas', this)">Entradas</button>
       <button onclick="abrirFinanceiro('finSaidas', this)">Saídas</button>
       <button onclick="abrirFinanceiro('finMovimentacoes', this)">Movimentações e Resultados</button>
@@ -655,6 +656,29 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
         <button class="gray" onclick="fecharModalPrepararMes()">Cancelar</button>
         <button class="gray" onclick="ppmConfirmarTodas()">Confirmar todas</button>
         <button class="dark" onclick="ppmGerarSelecionadas()">Gerar contas selecionadas</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="finFornecedores" class="finance-subsection">
+    <div class="panel">
+      <div class="cp-topo">
+        <div>
+          <h3>Dívidas por Fornecedor</h3>
+          <p class="muted">Cada conta com o campo "Fornecedor" preenchido aparece agrupada aqui — pra ver rapidinho o quanto se deve pra cada um, sem precisar de planilha separada. Continua contando normalmente nos totais gerais do Financeiro.</p>
+        </div>
+      </div>
+      <input id="fornBusca" class="inline-input" style="max-width:280px;margin-bottom:14px" placeholder="Buscar fornecedor..." oninput="renderFornecedores()">
+      <div id="listaFornecedores" class="os-grid"></div>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalFornecedorOverlay">
+    <div class="cp-modal wide">
+      <h3 id="fornecedorTitulo">Fornecedor</h3>
+      <div id="fornecedorConteudo"></div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalFornecedor()">Fechar</button>
       </div>
     </div>
   </div>
@@ -1286,6 +1310,7 @@ function abrirFinanceiro(id,btn){
   // (e deixava a troca de aba lenta). Só Relatórios não faz parte dessa cadeia.
   renderFinanceiro(window.filtroAtual||'todos');
   renderRelatorios();
+  if(typeof renderFornecedores==='function') renderFornecedores();
 }
 
 function atualizarDashboard(){
@@ -3444,7 +3469,103 @@ function excluirConta(i){
   finance.splice(i,1);
   renderFinanceiro(window.filtroAtual||'todos');
   atualizarDashboard();
+  if(typeof renderFornecedores==='function') renderFornecedores();
   salvarAgora();
+}
+function _agruparPorFornecedor(){
+  const grupos={};
+  const ordem=[];
+  finance.forEach((c,i)=>{
+    const nome=(c.fornecedor||'').trim();
+    if(!nome) return;
+    if(!grupos[nome]){ grupos[nome]={nome, contas:[]}; ordem.push(nome); }
+    grupos[nome].contas.push({...c, _index:i});
+  });
+  ordem.sort((a,b)=>a.localeCompare(b));
+  return ordem.map(n=>grupos[n]);
+}
+function renderFornecedores(){
+  const cont=document.getElementById('listaFornecedores');
+  if(!cont)return;
+  const termo=normalizarTextoBusca(document.getElementById('fornBusca')?.value||'');
+  const todos=_agruparPorFornecedor();
+  let grupos=todos;
+  if(termo) grupos=grupos.filter(g=>normalizarTextoBusca(g.nome).includes(termo));
+
+  if(grupos.length===0){
+    cont.innerHTML = todos.length===0
+      ? '<div class="os-vazio">Nenhuma conta com o campo "Fornecedor" preenchido ainda. Ao cadastrar ou editar uma conta em Pagamentos, preencha esse campo pra ela aparecer agrupada aqui.</div>'
+      : '<div class="os-vazio">Nenhum fornecedor encontrado para essa busca.</div>';
+    return;
+  }
+  cont.innerHTML = grupos.map(g=>{
+    const pendentes = g.contas.filter(c=>c.status!=='Pago');
+    const totalPendente = pendentes.reduce((s,c)=>s+Number(c.valor||0),0);
+    const totalPago = g.contas.filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
+    const proxima = [...pendentes].sort((a,b)=>String(a.data).localeCompare(String(b.data)))[0];
+    return `<div class="os-card">
+      <div class="os-card-top">
+        <div class="os-cliente-nome">${escapeHtml(g.nome)}</div>
+        <span class="badge ${pendentes.length?'orange':'green'}">${pendentes.length} pendente${pendentes.length!==1?'s':''}</span>
+      </div>
+      <div class="os-linha-info"><span>Total em aberto</span><strong>${moeda(totalPendente)}</strong></div>
+      <div class="os-linha-info"><span>Já pago</span><strong>${moeda(totalPago)}</strong></div>
+      <div class="os-linha-info"><span>Próximo vencimento</span><strong>${proxima?dataBR(proxima.data):'-'}</strong></div>
+      <div class="os-card-acoes">
+        <button class="dark" onclick="abrirDetalhesFornecedor('${g.nome.replace(/'/g,"\\'")}')">Ver contas</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function abrirDetalhesFornecedor(nome){
+  window.__fornecedorAtual=nome;
+  document.getElementById('fornecedorTitulo').innerText='Fornecedor — '+nome;
+  renderFornecedorConteudo();
+  modalFornecedorOverlay.classList.add('aberto');
+}
+function fecharModalFornecedor(){ modalFornecedorOverlay.classList.remove('aberto'); renderFornecedores(); }
+function renderFornecedorConteudo(){
+  const nome=window.__fornecedorAtual;
+  const cont=document.getElementById('fornecedorConteudo');
+  if(!cont)return;
+  const contas = finance.map((c,i)=>({...c,_index:i})).filter(c=>(c.fornecedor||'').trim()===nome);
+  const pendentes = contas.filter(c=>c.status!=='Pago');
+  const totalPendente = pendentes.reduce((s,c)=>s+Number(c.valor||0),0);
+  const totalPago = contas.filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
+  const ordenadas=[...contas].sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+
+  cont.innerHTML = `
+    <div class="os-modal-stats">
+      <div class="os-modal-stat"><small>Em aberto</small><strong>${moeda(totalPendente)}</strong></div>
+      <div class="os-modal-stat"><small>Já pago</small><strong>${moeda(totalPago)}</strong></div>
+      <div class="os-modal-stat"><small>Total de contas</small><strong>${contas.length}</strong></div>
+    </div>
+    <table>
+      <thead><tr><th>Vencimento</th><th>Descrição</th><th>Parcela</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead>
+      <tbody>
+        ${ordenadas.length ? ordenadas.map(c=>`<tr>
+          <td>${dataBR(c.data)}</td>
+          <td>${escapeHtml(c.descricao||'-')}</td>
+          <td>${c.parcelaAtual?escapeHtml(String(c.parcelaAtual))+(c.totalParcelas?'/'+escapeHtml(String(c.totalParcelas)):''):'-'}</td>
+          <td>${moeda(c.valor)}</td>
+          <td>${c.status==='Pago'?'<span class="badge green">Pago</span>':'<span class="badge orange">Pendente</span>'}</td>
+          <td>
+            ${c.status!=='Pago'?`<button class="green" onclick="marcarContaPaga(${c._index})">Pagar</button>`:''}
+            <button class="gray" onclick="fecharModalFornecedor();editarConta(${c._index})">Editar</button>
+            <button class="red" onclick="excluirConta(${c._index});renderFornecedorConteudo()">Excluir</button>
+          </td>
+        </tr>`).join('') : '<tr><td colspan="6" class="muted">Nenhuma conta ainda.</td></tr>'}
+      </tbody>
+    </table>
+    <div class="actions" style="margin-top:12px">
+      <button class="dark" onclick="abrirNovaContaComFornecedor('${nome.replace(/'/g,"\\'")}')">+ Adicionar nova conta pra ${escapeHtml(nome)}</button>
+    </div>
+  `;
+}
+function abrirNovaContaComFornecedor(nome){
+  fecharModalFornecedor();
+  abrirNovaConta();
+  mcFornecedor.value = nome;
 }
 function mesAtualISO(){ return dataHojeISO().slice(0,7); }
 function filtrarFinanceiro(valor){
@@ -3870,6 +3991,7 @@ function salvarContaForm(){
   fecharModalConta();
   filtrarFinanceiro(window.filtroAtual||'pendentes');
   atualizarDashboard();
+  if(typeof renderFornecedores==='function') renderFornecedores();
   salvarAgora();
 }
 function marcarContaPaga(i){
@@ -3891,6 +4013,7 @@ function confirmarPagamentoConta(){
   fecharModalPagamento();
   renderFinanceiro(window.filtroAtual||'pendentes');
   atualizarDashboard();
+  if(typeof renderFornecedores==='function') renderFornecedores();
   salvarAgora();
 }
 function desfazerPagamento(i){
