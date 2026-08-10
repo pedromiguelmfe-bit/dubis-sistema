@@ -224,7 +224,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <button onclick="abrir('fiados',this)">4. Fiados e Acordos</button>
     <button onclick="abrir('financeiro',this)">4. Financeiro</button>
     <button onclick="abrir('estoque',this)">5. Estoque</button>
-    <button onclick="abrir('fornecedores',this)">6. Fornecedores</button>
+    <button onclick="abrir('fornecedores',this);renderFornecedores()">6. Fornecedores</button>
     <button onclick="abrir('funcionarios',this)">7. Funcionários</button>
     <button onclick="abrir('clientes',this)">8. Clientes</button>
   </nav>
@@ -427,7 +427,6 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <div class="finance-tabs">
       <button class="activeTab" onclick="abrirFinanceiro('finResumo', this)">Resumo</button>
       <button onclick="abrirFinanceiro('finPagamentos', this)">Pagamentos</button>
-      <button onclick="abrirFinanceiro('finFornecedores', this)">Fornecedores</button>
       <button onclick="abrirFinanceiro('finEntradas', this)">Entradas</button>
       <button onclick="abrirFinanceiro('finSaidas', this)">Saídas</button>
       <button onclick="abrirFinanceiro('finMovimentacoes', this)">Movimentações e Resultados</button>
@@ -656,29 +655,6 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
         <button class="gray" onclick="fecharModalPrepararMes()">Cancelar</button>
         <button class="gray" onclick="ppmConfirmarTodas()">Confirmar todas</button>
         <button class="dark" onclick="ppmGerarSelecionadas()">Gerar contas selecionadas</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="finFornecedores" class="finance-subsection">
-    <div class="panel">
-      <div class="cp-topo">
-        <div>
-          <h3>Dívidas por Fornecedor</h3>
-          <p class="muted">Cada conta com o campo "Fornecedor" preenchido aparece agrupada aqui — pra ver rapidinho o quanto se deve pra cada um, sem precisar de planilha separada. Continua contando normalmente nos totais gerais do Financeiro.</p>
-        </div>
-      </div>
-      <input id="fornBusca" class="inline-input" style="max-width:280px;margin-bottom:14px" placeholder="Buscar fornecedor..." oninput="renderFornecedores()">
-      <div id="listaFornecedores" class="os-grid"></div>
-    </div>
-  </div>
-
-  <div class="cp-modal-overlay" id="modalFornecedorOverlay">
-    <div class="cp-modal wide">
-      <h3 id="fornecedorTitulo">Fornecedor</h3>
-      <div id="fornecedorConteudo"></div>
-      <div class="actions">
-        <button class="gray" onclick="fecharModalFornecedor()">Fechar</button>
       </div>
     </div>
   </div>
@@ -923,7 +899,24 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <div id="listaEstoque"></div>
   </div>
 </section>
-<section id="fornecedores" class="section"><div class="panel"><h3>Fornecedores</h3><p class="muted">Módulo reservado.</p></div></section>
+<section id="fornecedores" class="section">
+  <div class="panel">
+    <h3>Fornecedores</h3>
+    <p class="muted">Cada fornecedor vira um quadrinho, igual à planilha: data de vencimento, descrição e valor, linha por linha, com o total somado sozinho. Continua contando normalmente nos totais do Financeiro.</p>
+    <input id="fornBusca" class="inline-input" style="max-width:280px;margin-bottom:14px" placeholder="Buscar fornecedor..." oninput="renderFornecedores()">
+    <div id="listaFornecedores" class="os-grid"></div>
+  </div>
+</section>
+
+<div class="cp-modal-overlay" id="modalFornecedorOverlay">
+  <div class="cp-modal wide">
+    <h3 id="fornecedorTitulo">Fornecedor</h3>
+    <div id="fornecedorConteudo"></div>
+    <div class="actions">
+      <button class="gray" onclick="fecharModalFornecedor()">Fechar</button>
+    </div>
+  </div>
+</div>
 <section id="funcionarios" class="section">
   <div class="panel">
     <h3 id="funcionarioTitulo">Cadastro de funcionários</h3>
@@ -1310,7 +1303,6 @@ function abrirFinanceiro(id,btn){
   // (e deixava a troca de aba lenta). Só Relatórios não faz parte dessa cadeia.
   renderFinanceiro(window.filtroAtual||'todos');
   renderRelatorios();
-  if(typeof renderFornecedores==='function') renderFornecedores();
 }
 
 function atualizarDashboard(){
