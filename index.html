@@ -515,9 +515,17 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
           <option value="semana">Semana</option>
           <option value="mes" selected>Mês</option>
         </select>
-        <label style="font-size:13px;font-weight:700;color:#374151">Saldo inicial hoje (R$):</label>
+        <label style="font-size:13px;font-weight:700;color:#374151">Mostrar antes de hoje:</label>
+        <select id="fluxoHistorico" class="inline-input" style="max-width:150px" onchange="renderFluxoCaixa()">
+          <option value="0">Só daqui pra frente</option>
+          <option value="3" selected>3 períodos atrás</option>
+          <option value="6">6 períodos atrás</option>
+          <option value="12">12 períodos atrás</option>
+          <option value="999">Tudo</option>
+        </select>
+        <label style="font-size:13px;font-weight:700;color:#374151">Saldo inicial (R$):</label>
         <input id="fluxoSaldoInicial" class="inline-input" type="number" step="0.01" style="max-width:140px" placeholder="Ex: saldo do banco" oninput="renderFluxoCaixa()">
-        <small class="muted">deixe em branco pra começar do zero</small>
+        <small class="muted">saldo no começo do primeiro período mostrado</small>
       </div>
 
       <div class="os-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:14px">
@@ -2899,50 +2907,76 @@ function renderFluxoCaixa(){
   const hoje=dataHojeISO();
   const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
 
-  // Coleta eventos futuros (>= hoje) com data definida
-  const eventos=[]; // {data, entrada, saida}
+  // Coleta eventos: PASSADO = realizado (entradas/saídas que de fato aconteceram),
+  // FUTURO = projetado (contas em aberto e recebimentos previstos).
+  const eventos=[]; // {data, entrada, saida, realizado}
+
+  const qtdHistorico=Number(document.getElementById('fluxoHistorico')?.value||0);
+  if(qtdHistorico>0){
+    // Realizado: tudo que já entrou e saiu de verdade, antes de hoje
+    entradas.forEach(e=>{
+      if(!e.data || e.data>=hoje) return;
+      eventos.push({data:e.data, entrada:Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0), saida:0, realizado:true});
+    });
+    saidas.forEach(s=>{
+      if(!s.data || s.data>=hoje) return;
+      eventos.push({data:s.data, entrada:0, saida:Number(s.valor||0), realizado:true});
+    });
+  }
+
   // Saídas previstas: contas a pagar em aberto
   finance.forEach(c=>{
     if(c.status==='Pago'||c.status==='Cancelada') return;
     if(!c.data || c.data<hoje) return;
-    eventos.push({data:c.data, entrada:0, saida:Number(c.valor||0)});
+    eventos.push({data:c.data, entrada:0, saida:Number(c.valor||0), realizado:false});
   });
   // Saídas previstas: lançamentos de fornecedor pendentes
   dividasFornecedores.forEach(l=>{
     if(l.pago || !l.data || l.data<hoje) return;
-    eventos.push({data:l.data, entrada:0, saida:Number(l.valor||0)});
+    eventos.push({data:l.data, entrada:0, saida:Number(l.valor||0), realizado:false});
   });
   // Entradas previstas: parcelas de fiado ainda não pagas
   _listaFiados().forEach(o=>{
     (o.parcelasAcordo||[]).forEach(p=>{
       if(p.pago || !p.data || p.data<hoje) return;
-      eventos.push({data:p.data, entrada:Number(p.valor||0), saida:0});
+      eventos.push({data:p.data, entrada:Number(p.valor||0), saida:0, realizado:false});
     });
   });
   // Entradas previstas: contas a receber avulsas em aberto
   contasReceber.forEach(cr=>{
     if(cr.status==='Recebido'||cr.status==='Cancelado') return;
     if(!cr.previsao || cr.previsao<hoje) return;
-    eventos.push({data:cr.previsao, entrada:Number(cr.valor||0), saida:0});
+    eventos.push({data:cr.previsao, entrada:Number(cr.valor||0), saida:0, realizado:false});
   });
 
   // Agrupa
   const grupos={};
   eventos.forEach(ev=>{
     const k=_chaveFluxo(ev.data, agrupar);
-    if(!grupos[k]) grupos[k]={entrada:0, saida:0};
+    if(!grupos[k]) grupos[k]={entrada:0, saida:0, realizado:ev.realizado};
     grupos[k].entrada+=ev.entrada;
     grupos[k].saida+=ev.saida;
+    if(!ev.realizado) grupos[k].realizado=false; // se tem algo projetado, o período é projetado
   });
-  const chaves=Object.keys(grupos).sort();
+  let chaves=Object.keys(grupos).sort();
 
-  const totalEntrar=eventos.reduce((s,e)=>s+e.entrada,0);
-  const totalSair=eventos.reduce((s,e)=>s+e.saida,0);
+  // Limita quantos períodos passados aparecem
+  if(qtdHistorico>0 && qtdHistorico<999){
+    const chaveHoje=_chaveFluxo(hoje, agrupar);
+    const passadas=chaves.filter(k=>k<chaveHoje);
+    const futuras=chaves.filter(k=>k>=chaveHoje);
+    chaves=[...passadas.slice(-qtdHistorico), ...futuras];
+  }
+
+  // Totais consideram só o que está projetado (futuro), que é o foco da tela
+  const chaveHojeRef=_chaveFluxo(hoje, agrupar);
+  const totalEntrar=chaves.filter(k=>k>=chaveHojeRef).reduce((s,k)=>s+grupos[k].entrada,0);
+  const totalSair=chaves.filter(k=>k>=chaveHojeRef).reduce((s,k)=>s+grupos[k].saida,0);
   setTxt('fxTotalEntrar', moeda(totalEntrar));
   setTxt('fxTotalSair', moeda(totalSair));
 
   if(chaves.length===0){
-    cont.innerHTML='<tr><td colspan="5" class="muted">Nenhum evento futuro com data definida pra projetar. Cadastre vencimentos e previsões de recebimento pra ver o fluxo.</td></tr>';
+    cont.innerHTML='<tr><td colspan="5" class="muted">Nenhum evento com data definida pra mostrar. Cadastre vencimentos e previsões de recebimento pra ver o fluxo.</td></tr>';
     setTxt('fxMenorSaldo', moeda(saldoInicial));
     document.getElementById('fxAlertaNegativo').innerHTML='';
     return;
@@ -2953,13 +2987,18 @@ function renderFluxoCaixa(){
   let primeiroNegativo=null;
   cont.innerHTML = chaves.map(k=>{
     const g=grupos[k];
+    const passado = k<chaveHojeRef;
     const resultado=g.entrada-g.saida;
     acumulado+=resultado;
-    if(acumulado<menorSaldo) menorSaldo=acumulado;
-    if(acumulado<0 && !primeiroNegativo) primeiroNegativo=k;
+    // O alerta de caixa negativo só olha pro futuro — o passado já aconteceu.
+    if(!passado){
+      if(acumulado<menorSaldo) menorSaldo=acumulado;
+      if(acumulado<0 && !primeiroNegativo) primeiroNegativo=k;
+    }
     const corAcum=acumulado<0?'#991b1b':'#166534';
-    return `<tr>
-      <td><strong>${_rotuloFluxo(k,agrupar)}</strong></td>
+    const selo = passado ? '<span class="badge gray" style="font-size:10px">Realizado</span>' : '<span class="badge blue" style="font-size:10px">Previsto</span>';
+    return `<tr style="${passado?'background:#fafafa':''}">
+      <td><strong>${_rotuloFluxo(k,agrupar)}</strong><br>${selo}</td>
       <td style="color:#166534">${g.entrada>0?moeda(g.entrada):'-'}</td>
       <td style="color:#991b1b">${g.saida>0?moeda(g.saida):'-'}</td>
       <td style="color:${resultado>=0?'#166534':'#991b1b'}">${moeda(resultado)}</td>
