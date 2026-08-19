@@ -153,6 +153,10 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 .os-tab:not(.ativa) .contagem{background:#f3f4f6;color:#374151}
 .os-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
 .os-card{background:#fff;border:1px solid #eef0f3;border-radius:18px;padding:18px;box-shadow:0 2px 10px rgba(17,24,39,.04);display:flex;flex-direction:column;gap:10px}
+.pg-clicavel{cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.pg-clicavel:hover{box-shadow:0 6px 18px rgba(17,24,39,.10);border-color:#f59e0b}
+.pg-grupo-titulo{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.pg-grupo-titulo h3{margin:0;font-size:16px}
 .os-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .os-cliente-nome{font-size:16px;font-weight:800;color:#111827}
 .os-veiculo-linha{color:#6b7280;font-size:13px}
@@ -441,30 +445,52 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
   </div>
 
   <div id="finPainel" class="finance-subsection active">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="gray" onclick="painelMudarMes(-1)">‹</button>
-        <strong id="painelMesLabel" style="font-size:16px;min-width:150px;text-align:center">—</strong>
-        <button class="gray" onclick="painelMudarMes(1)">›</button>
+    <div class="panel" style="margin-top:0">
+      <div class="pg-grupo-titulo">
+        <h3>Contas a Pagar</h3>
+        <button class="gray" onclick="pgPdfContasAPagar()">PDF Relatório</button>
       </div>
-      <button class="gray" onclick="painelMesAtual()">Mês atual</button>
+      <div class="os-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="os-card pg-clicavel" onclick="pgAbrirContasAPagar('mes')"><small class="muted">MÊS</small><strong style="font-size:20px" id="pgCapMes">R$ 0,00</strong><small class="muted">Total pendente do mês</small></div>
+        <div class="os-card pg-clicavel" onclick="pgAbrirContasAPagar('semana')"><small class="muted">SEMANA</small><strong style="font-size:20px" id="pgCapSemana">R$ 0,00</strong><small class="muted">Total pendente da semana</small></div>
+        <div class="os-card pg-clicavel" onclick="pgAbrirContasAPagar('hoje')"><small class="muted">HOJE</small><strong style="font-size:20px" id="pgCapHoje">R$ 0,00</strong><small class="muted">Total que vence hoje</small></div>
+      </div>
     </div>
 
-    <div class="os-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
-      <div class="os-card"><small class="muted">Saldo atual em conta</small><strong id="pgSaldoAtual" style="font-size:22px">R$ 0,00</strong></div>
-      <div class="os-card"><small class="muted">Recebido no mês</small><strong id="pgRecebidoMes" style="font-size:22px;color:#166534">R$ 0,00</strong></div>
-      <div class="os-card"><small class="muted">Despesas no mês</small><strong id="pgDespesasMes" style="font-size:22px;color:#991b1b">R$ 0,00</strong></div>
-      <div class="os-card"><small class="muted">Saldo do mês</small><strong id="pgSaldoMes" style="font-size:22px">R$ 0,00</strong></div>
-      <div class="os-card"><small class="muted">A pagar no mês</small><strong id="pgPagarMes" style="font-size:22px">R$ 0,00</strong></div>
-      <div class="os-card"><small class="muted">Saldo projetado (fim do mês)</small><strong id="pgSaldoProjetado" style="font-size:22px">R$ 0,00</strong></div>
-      <div class="os-card"><small class="muted">Ainda a receber (fiados)</small><strong id="pgAReceber" style="font-size:22px;color:#c2660a">R$ 0,00</strong></div>
-      <div class="os-card"><small class="muted">Comparativo com mês anterior</small><strong id="pgComparativo" style="font-size:18px">—</strong></div>
+    <div class="panel">
+      <div class="pg-grupo-titulo">
+        <h3>Registro de Contas Recebidas</h3>
+        <button class="gray" onclick="pgPdfContasRecebidas()">PDF Relatório</button>
+      </div>
+      <div class="os-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="os-card pg-clicavel" onclick="pgAbrirContasRecebidas('mes')"><small class="muted">MÊS</small><strong style="font-size:20px;color:#166534" id="pgCrMes">R$ 0,00</strong><small class="muted">Somente valores recebidos</small></div>
+        <div class="os-card pg-clicavel" onclick="pgAbrirContasRecebidas('semana')"><small class="muted">SEMANA</small><strong style="font-size:20px;color:#166534" id="pgCrSemana">R$ 0,00</strong><small class="muted">Recebidos na semana</small></div>
+        <div class="os-card pg-clicavel" onclick="pgAbrirContasRecebidas('hoje')"><small class="muted">HOJE</small><strong style="font-size:20px;color:#166534" id="pgCrHoje">R$ 0,00</strong><small class="muted">Recebidos hoje</small></div>
+      </div>
     </div>
 
-    <div class="os-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-top:14px">
-      <div class="os-card" style="border-left:4px solid #ef4444"><small class="muted">Contas vencidas</small><strong id="pgVencidasValor" style="font-size:18px;color:#991b1b">R$ 0,00</strong><small class="muted" id="pgVencidasQtd">0 contas</small></div>
-      <div class="os-card" style="border-left:4px solid #f59e0b"><small class="muted">A pagar hoje</small><strong id="pgPagarHoje" style="font-size:18px">R$ 0,00</strong></div>
-      <div class="os-card" style="border-left:4px solid #3b82f6"><small class="muted">Próximos 7 dias</small><strong id="pgPagar7dias" style="font-size:18px">R$ 0,00</strong></div>
+    <div class="panel">
+      <div class="pg-grupo-titulo">
+        <h3>Controle de Contas</h3>
+        <button class="gray" onclick="pgPdfControle()">PDF Relatório</button>
+      </div>
+      <div class="os-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="os-card pg-clicavel" onclick="pgAbrirControle('pagas')"><small class="muted">PAGAS</small><strong style="font-size:20px;color:#166534" id="pgCcPagas">R$ 0,00</strong><small class="muted">Contas efetivamente pagas (mês)</small></div>
+        <div class="os-card pg-clicavel" onclick="pgAbrirControle('vencidas')"><small class="muted">VENCIDAS</small><strong style="font-size:20px;color:#991b1b" id="pgCcVencidas">R$ 0,00</strong><small class="muted">Pendentes com data vencida</small></div>
+        <div class="os-card pg-clicavel" onclick="pgAbrirControle('avencer')"><small class="muted">A VENCER</small><strong style="font-size:20px" id="pgCcAVencer">R$ 0,00</strong><small class="muted">Pendentes futuras</small></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="pg-grupo-titulo">
+        <h3>Renda / Resultado das Ordens de Serviço</h3>
+        <button class="gray" onclick="pgPdfRenda()">PDF Relatório por veículo/OS</button>
+      </div>
+      <div class="os-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="os-card pg-clicavel" onclick="pgAbrirRenda()"><small class="muted">BRUTO</small><strong style="font-size:20px" id="pgRendaBruto">R$ 0,00</strong><small class="muted">Valor recebido das OS (mês)</small></div>
+        <div class="os-card pg-clicavel" onclick="pgAbrirRenda()"><small class="muted">LÍQUIDO</small><strong style="font-size:20px" id="pgRendaLiquido">R$ 0,00</strong><small class="muted">Resultado após custos registrados</small></div>
+        <div class="os-card pg-clicavel" onclick="pgAbrirRenda()"><small class="muted">MARGEM</small><strong style="font-size:20px" id="pgRendaMargem">0,0%</strong><small class="muted">Indicador complementar</small></div>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px" id="pgGraficosWrap">
@@ -478,24 +504,20 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
-      <div class="panel" style="margin-top:0">
-        <h4 style="margin-bottom:10px">Próximos vencimentos</h4>
-        <div id="pgProximosVencimentos"></div>
-      </div>
-      <div class="panel" style="margin-top:0">
-        <h4 style="margin-bottom:10px">Próximos recebimentos</h4>
-        <div id="pgProximosRecebimentos"></div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h4 style="margin-bottom:10px">⚠️ Alertas</h4>
-      <div id="pgAlertas"></div>
-    </div>
-
     <div style="text-align:center;margin-top:10px">
       <button class="gray" onclick="abrirFinanceiro('finCalendario', document.querySelector('.finance-tabs button:nth-child(8)'))">Ver Calendário Financeiro completo →</button>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalListagemOverlay">
+    <div class="cp-modal wide">
+      <h3 id="lstTitulo">Listagem</h3>
+      <p class="muted" id="lstSubtitulo"></p>
+      <div id="lstConteudo"></div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalListagem()">Fechar</button>
+        <button class="dark" onclick="gerarPdfListagemAtual()">Gerar PDF</button>
+      </div>
     </div>
   </div>
 
@@ -2567,14 +2589,6 @@ async function marcarParcelaAcordoPaga(quoteId, parcelaId){
 /* ===== Relatórios Financeiros ===== */
 function relMesAnterior(){ window.relMesRef = _mesAnteriorISO(window.relMesRef||mesAtualISO()); renderRelatorios(); }
 function relProximoMes(){ window.relMesRef = _proximoMesISO(window.relMesRef||mesAtualISO()); renderRelatorios(); }
-function painelMudarMes(delta){
-  const ref = window.painelMesRef || mesAtualISO();
-  const [a,m] = ref.split('-').map(Number);
-  const d = new Date(a, m-1+delta, 1);
-  window.painelMesRef = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  renderPainelGeral();
-}
-function painelMesAtual(){ window.painelMesRef = mesAtualISO(); renderPainelGeral(); }
 function _entradasDoMes(mesRef){
   return entradas.filter(e=>String(e.data||'').slice(0,7)===mesRef)
     .reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
@@ -3025,81 +3039,238 @@ function renderFluxoCaixa(){
     : `<div style="background:#dcfce7;color:#166534;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:700">✅ Pela projeção, o caixa se mantém positivo em todo o período.</div>`;
 }
 
+/* ===== Painel Geral (Bloco 1) — blocos clicáveis ===== */
+function _semanaAtualInicioFim(){
+  const hoje=new Date(dataHojeISO()+'T00:00:00');
+  const diaSemana=(hoje.getDay()+6)%7; // 0=segunda
+  const ini=new Date(hoje); ini.setDate(ini.getDate()-diaSemana);
+  const fim=new Date(ini); fim.setDate(fim.getDate()+6);
+  return {inicio: ini.toISOString().slice(0,10), fim: fim.toISOString().slice(0,10)};
+}
+function _statusPendenteGenerico(dataISO){
+  const d=_diasAteVencimento(dataISO);
+  if(d<0) return 'Vencido';
+  if(d===0) return 'Vence hoje';
+  return 'A vencer';
+}
+function _listaContasAPagarPendentes(){
+  const lista=[];
+  finance.forEach((c,i)=>{
+    if(c.status==='Pago'||c.status==='Parcialmente pago'||c.status==='Cancelada') return;
+    if(!c.data) return;
+    lista.push({data:c.data, descricao:c.descricao||'-', categoria:c.categoria||'-', valor:Number(c.valor||0), status:_statusPendenteGenerico(c.data), acao:{tipo:'conta', idx:i}});
+  });
+  dividasFornecedores.forEach(l=>{
+    if(l.pago || !l.data) return;
+    lista.push({data:l.data, descricao:'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):''), categoria:'Fornecedor', valor:Number(l.valor||0), status:_statusPendenteGenerico(l.data), acao:{tipo:'fornecedor', id:l.id}});
+  });
+  return lista;
+}
+function _filtrarPorPeriodo(lista, tipo, campoData){
+  const hoje=dataHojeISO();
+  const {inicio:semIni, fim:semFim}=_semanaAtualInicioFim();
+  const mesAtual=mesAtualISO();
+  return lista.filter(x=>{
+    const d=x[campoData];
+    if(!d) return false;
+    if(tipo==='hoje') return d===hoje;
+    if(tipo==='semana') return d>=semIni && d<=semFim;
+    return d.slice(0,7)===mesAtual;
+  });
+}
+function _cardContasAPagar(tipo){
+  const lista=_filtrarPorPeriodo(_listaContasAPagarPendentes(), tipo, 'data');
+  lista.sort((a,b)=>a.data.localeCompare(b.data));
+  return {total:lista.reduce((s,x)=>s+x.valor,0), lista};
+}
+function _cardContasRecebidas(tipo){
+  const base=entradas.filter(e=>e.data).map(e=>({data:e.data, descricao:e.descricao||'-', categoria:e.origem||'Entrada', valor:Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0), status:'Recebido', acao:null}));
+  const lista=_filtrarPorPeriodo(base, tipo, 'data');
+  lista.sort((a,b)=>b.data.localeCompare(a.data));
+  return {total:lista.reduce((s,x)=>s+x.valor,0), lista};
+}
+function _cardPagas(){
+  const mesAtual=mesAtualISO();
+  const lista=saidas.filter(s=>(s.origem==='ContaPaga'||s.origem==='DividaFornecedor') && String(s.data||'').slice(0,7)===mesAtual)
+    .map(s=>({data:s.data, descricao:s.descricao||'-', categoria:s.categoria||'-', valor:Number(s.valor||0), status:'Pago', acao:null}));
+  lista.sort((a,b)=>b.data.localeCompare(a.data));
+  return {total:lista.reduce((s,x)=>s+x.valor,0), lista};
+}
+function _cardVencidas(){
+  const lista=_listaContasAPagarPendentes().filter(x=>x.status==='Vencido');
+  lista.sort((a,b)=>a.data.localeCompare(b.data));
+  return {total:lista.reduce((s,x)=>s+x.valor,0), lista};
+}
+function _cardAVencer(){
+  const lista=_listaContasAPagarPendentes().filter(x=>x.status!=='Vencido');
+  lista.sort((a,b)=>a.data.localeCompare(b.data));
+  return {total:lista.reduce((s,x)=>s+x.valor,0), lista};
+}
+function _cardRenda(){
+  const mesAtual=mesAtualISO();
+  // Quais OS receberam algum pagamento (direto ou parcela de acordo) neste mês
+  const entradasOS = entradas.filter(e=>e.origem==='Ordem de Serviço' && e.osRef && String(e.data||'').slice(0,7)===mesAtual);
+  const porOS={};
+  entradasOS.forEach(e=>{
+    const key=String(e.osRef);
+    if(!porOS[key]) porOS[key]=0;
+    porOS[key]+=Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0);
+  });
+  const linhas=Object.keys(porOS).map(osRef=>{
+    const os = servicosConcluidos.find(s=>String(s.quoteId)===osRef) || serviceOrders.find(s=>String(s.quoteId)===osRef);
+    let custoPecas=0;
+    (os && os.items ? os.items : []).forEach(it=>{ const bruto=Number(it.valorBruto||0); if(bruto>0) custoPecas += Number(it.qtd||0)*bruto; });
+    const bruto=porOS[osRef];
+    const resultado=bruto-custoPecas;
+    const margem = bruto>0 ? (resultado/bruto*100) : 0;
+    return {osRef, cliente:(os&&os.cliente)||'-', veiculo:(os&&os.veiculo)||'', bruto, custos:custoPecas, resultado, margem};
+  });
+  linhas.sort((a,b)=>b.bruto-a.bruto);
+  const totalBruto=linhas.reduce((s,l)=>s+l.bruto,0);
+  const totalCustos=linhas.reduce((s,l)=>s+l.custos,0);
+  const totalLiquido=totalBruto-totalCustos;
+  const margemGeral = totalBruto>0 ? (totalLiquido/totalBruto*100) : 0;
+  return {totalBruto, totalCustos, totalLiquido, margemGeral, linhas};
+}
+
+/* ---- Listagem genérica (modal aberto pelos cards) ---- */
+function _linhaListagemContaHtml(item){
+  const cor = item.status==='Vencido'?'red':item.status==='Vence hoje'?'orange':item.status==='Pago'||item.status==='Recebido'?'green':'blue';
+  let acaoHtml='-';
+  if(item.acao && item.acao.tipo==='conta') acaoHtml=`<button class="green" onclick="fecharModalListagem();marcarContaPaga(${item.acao.idx})">Concluir</button>`;
+  if(item.acao && item.acao.tipo==='fornecedor') acaoHtml=`<button class="green" onclick="fecharModalListagem();marcarParcelaFornecedorPaga('${item.acao.id}')">Concluir</button>`;
+  return `<tr>
+    <td>${dataBR(item.data)}</td>
+    <td>${escapeHtml(item.descricao)}</td>
+    <td>${escapeHtml(item.categoria)}</td>
+    <td>${moeda(item.valor)}</td>
+    <td><span class="badge ${cor}">${escapeHtml(item.status)}</span></td>
+    <td>${acaoHtml}</td>
+  </tr>`;
+}
+function _tabelaListagemContas(lista){
+  return `<table class="finance-table"><thead><tr><th>Vencimento</th><th>Descrição/Fornecedor</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead>
+    <tbody>${lista.length?lista.map(_linhaListagemContaHtml).join(''):'<tr><td colspan="6" class="muted">Nada encontrado nesse período.</td></tr>'}</tbody></table>`;
+}
+function _linhaListagemRendaHtml(l){
+  const cor = l.margem>=40?'green':l.margem>=15?'orange':'red';
+  return `<tr>
+    <td>#${escapeHtml(l.osRef)}</td>
+    <td>${escapeHtml(l.cliente)}${l.veiculo?' - '+escapeHtml(l.veiculo):''}</td>
+    <td>${moeda(l.bruto)}</td>
+    <td>${moeda(l.custos)}</td>
+    <td>${moeda(l.resultado)}</td>
+    <td><span class="badge ${cor}">${l.margem.toFixed(1)}%</span></td>
+    <td><button onclick="fecharModalListagem();abrirDetalheOS('${l.osRef}')">Detalhes</button></td>
+  </tr>`;
+}
+function _tabelaListagemRenda(linhas){
+  return `<table class="finance-table"><thead><tr><th>OS</th><th>Cliente / Veículo</th><th>Bruto recebido</th><th>Custos registrados</th><th>Resultado</th><th>Margem</th><th>Ação</th></tr></thead>
+    <tbody>${linhas.length?linhas.map(_linhaListagemRendaHtml).join(''):'<tr><td colspan="7" class="muted">Nenhuma OS com recebimento neste mês.</td></tr>'}</tbody></table>
+    <p class="muted" style="margin-top:8px;font-size:12px">"Custos registrados" considera apenas os itens da OS que têm um custo de peça informado. Serviços sem custo cadastrado não entram nessa conta — por isso o resultado pode estar otimista quando o custo real não foi lançado.</p>`;
+}
+function abrirListagem(titulo, subtitulo, tabelaHtml, pdfContext){
+  document.getElementById('lstTitulo').innerText=titulo;
+  document.getElementById('lstSubtitulo').innerText=subtitulo;
+  document.getElementById('lstConteudo').innerHTML=tabelaHtml;
+  window.__pdfContextAtual=pdfContext;
+  modalListagemOverlay.classList.add('aberto');
+}
+function fecharModalListagem(){ modalListagemOverlay.classList.remove('aberto'); if(typeof renderPainelGeral==='function') renderPainelGeral(); }
+function _gerarPdfBloco(titulo, periodoTxt, totalTxt, qtdRegistros, colunas, linhasHtml, notaRodape){
+  const pdf = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:24px;color:#111827}
+    h1{font-size:20px;margin-bottom:4px} .muted{color:#6b7280;font-size:13px;margin-bottom:16px}
+    .cards{display:flex;gap:14px;margin-bottom:18px}
+    .card{border:1px solid #e5e7eb;border-radius:10px;padding:10px 16px}
+    .card small{color:#6b7280;display:block;font-size:11px}
+    .card strong{font-size:18px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{border-bottom:1px solid #e5e7eb;text-align:left;padding:6px 8px;font-size:12px}
+    th{background:#f9fafb}
+  </style></head><body>
+  <h1>${titulo}</h1>
+  <p class="muted">${periodoTxt} · Gerado em ${dataBR(dataHojeISO())}</p>
+  <div class="cards"><div class="card"><small>Total</small><strong>${totalTxt}</strong></div><div class="card"><small>Registros</small><strong>${qtdRegistros}</strong></div></div>
+  <table><thead><tr>${colunas.map(c=>'<th>'+c+'</th>').join('')}</tr></thead><tbody>${linhasHtml}</tbody></table>
+  ${notaRodape?('<p class="muted" style="margin-top:14px">'+notaRodape+'</p>'):''}
+  <script>window.onload=function(){window.print()}<\/script>
+  </body></html>`;
+  const w=window.open('','_blank'); w.document.write(pdf); w.document.close();
+}
+function gerarPdfListagemAtual(){
+  const ctx=window.__pdfContextAtual; if(!ctx)return;
+  _gerarPdfBloco(ctx.titulo, ctx.periodoTxt, ctx.totalTxt, ctx.qtd, ctx.colunas, ctx.linhasHtml, ctx.nota);
+}
+function _linhasPdfContas(lista){
+  return lista.map(item=>`<tr><td>${dataBR(item.data)}</td><td>${escapeHtml(item.descricao)}</td><td>${escapeHtml(item.categoria)}</td><td>${moeda(item.valor)}</td><td>${escapeHtml(item.status)}</td></tr>`).join('');
+}
+function _linhasPdfRenda(linhas){
+  return linhas.map(l=>`<tr><td>#${escapeHtml(l.osRef)}</td><td>${escapeHtml(l.cliente)}${l.veiculo?' - '+escapeHtml(l.veiculo):''}</td><td>${moeda(l.bruto)}</td><td>${moeda(l.custos)}</td><td>${moeda(l.resultado)}</td><td>${l.margem.toFixed(1)}%</td></tr>`).join('');
+}
+
+/* ---- Cliques nos cards ---- */
+function pgAbrirContasAPagar(tipo){
+  const {total,lista}=_cardContasAPagar(tipo);
+  const rotulo=tipo==='mes'?'do mês':tipo==='semana'?'da semana':'de hoje';
+  abrirListagem('Contas a Pagar — '+rotulo, `${lista.length} conta(s) pendente(s) · Total ${moeda(total)}`, _tabelaListagemContas(lista),
+    {titulo:'Contas a Pagar — '+rotulo, periodoTxt:'Contas pendentes '+rotulo, totalTxt:moeda(total), qtd:lista.length, colunas:['Vencimento','Descrição/Fornecedor','Categoria','Valor','Status'], linhasHtml:_linhasPdfContas(lista)});
+}
+function pgAbrirContasRecebidas(tipo){
+  const {total,lista}=_cardContasRecebidas(tipo);
+  const rotulo=tipo==='mes'?'do mês':tipo==='semana'?'da semana':'de hoje';
+  abrirListagem('Contas Recebidas — '+rotulo, `${lista.length} recebimento(s) · Total ${moeda(total)}`, _tabelaListagemContas(lista),
+    {titulo:'Contas Recebidas — '+rotulo, periodoTxt:'Recebimentos '+rotulo, totalTxt:moeda(total), qtd:lista.length, colunas:['Data','Descrição','Origem','Valor','Status'], linhasHtml:_linhasPdfContas(lista)});
+}
+function pgAbrirControle(tipo){
+  const r = tipo==='pagas'?_cardPagas():tipo==='vencidas'?_cardVencidas():_cardAVencer();
+  const titulos={pagas:'Contas Pagas — mês atual', vencidas:'Contas Vencidas', avencer:'Contas a Vencer'};
+  abrirListagem(titulos[tipo], `${r.lista.length} conta(s) · Total ${moeda(r.total)}`, _tabelaListagemContas(r.lista),
+    {titulo:titulos[tipo], periodoTxt:titulos[tipo], totalTxt:moeda(r.total), qtd:r.lista.length, colunas:['Data','Descrição/Fornecedor','Categoria','Valor','Status'], linhasHtml:_linhasPdfContas(r.lista)});
+}
+function pgAbrirRenda(){
+  const r=_cardRenda();
+  const nota='"Líquido" considera apenas os custos de peças efetivamente registrados nas OS. Não inclui mão de obra, comissões ou despesas indiretas — por isso não deve ser lido como lucro final do negócio.';
+  abrirListagem('Renda das Ordens de Serviço — mês atual', `${r.linhas.length} OS · Bruto ${moeda(r.totalBruto)} · Líquido ${moeda(r.totalLiquido)} · Margem ${r.margemGeral.toFixed(1)}%`, _tabelaListagemRenda(r.linhas),
+    {titulo:'Renda por OS/Veículo — mês atual', periodoTxt:'Ordens de serviço com recebimento no mês', totalTxt:moeda(r.totalLiquido)+' líquido (bruto '+moeda(r.totalBruto)+')', qtd:r.linhas.length, colunas:['OS','Cliente/Veículo','Bruto','Custos','Resultado','Margem'], linhasHtml:_linhasPdfRenda(r.linhas), nota});
+}
+function pgPdfContasAPagar(){ pgAbrirContasAPagar('mes'); gerarPdfListagemAtual(); }
+function pgPdfContasRecebidas(){ pgAbrirContasRecebidas('mes'); gerarPdfListagemAtual(); }
+function pgPdfControle(){
+  const pagas=_cardPagas(), vencidas=_cardVencidas(), avencer=_cardAVencer();
+  const todasLinhas=[...pagas.lista, ...vencidas.lista, ...avencer.lista];
+  _gerarPdfBloco('Controle de Contas', 'Pagas (mês atual) + Vencidas + A vencer (situação atual)', moeda(pagas.total+vencidas.total+avencer.total), todasLinhas.length, ['Data','Descrição/Fornecedor','Categoria','Valor','Status'], _linhasPdfContas(todasLinhas));
+}
+function pgPdfRenda(){ pgAbrirRenda(); gerarPdfListagemAtual(); }
+
 function renderPainelGeral(){
   if(!document.getElementById('finPainel'))return;
   finance.forEach(statusAutomaticoConta);
-  const mesRef = window.painelMesRef || mesAtualISO();
-  const hoje = dataHojeISO();
-  const [ano, mesN] = mesRef.split('-').map(Number);
-  const fimMesISO = mesRef+'-'+String(_ultimoDiaMes(ano,mesN)).padStart(2,'0');
   const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
 
-  const lbl=_mesLabelPt(mesRef);
-  setTxt('painelMesLabel', lbl.charAt(0).toUpperCase()+lbl.slice(1));
+  // 2.1 Contas a Pagar
+  setTxt('pgCapMes', moeda(_cardContasAPagar('mes').total));
+  setTxt('pgCapSemana', moeda(_cardContasAPagar('semana').total));
+  setTxt('pgCapHoje', moeda(_cardContasAPagar('hoje').total));
 
-  // ---- Indicadores principais ----
-  const recebidoMes = _entradasDoMes(mesRef);
-  const despesasMes = _saidasDoMes(mesRef);
-  const saldoMes = recebidoMes - despesasMes;
+  // 2.2 Contas Recebidas
+  setTxt('pgCrMes', moeda(_cardContasRecebidas('mes').total));
+  setTxt('pgCrSemana', moeda(_cardContasRecebidas('semana').total));
+  setTxt('pgCrHoje', moeda(_cardContasRecebidas('hoje').total));
 
-  // Saldo atual em conta = todas entradas - todas saídas até hoje (histórico acumulado)
-  const totalEntradasHist = entradas.reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
-  const totalSaidasHist = saidas.reduce((s,x)=>s+Number(x.valor||0),0);
-  const saldoAtual = totalEntradasHist - totalSaidasHist;
+  // 2.3 Controle de Contas
+  setTxt('pgCcPagas', moeda(_cardPagas().total));
+  setTxt('pgCcVencidas', moeda(_cardVencidas().total));
+  setTxt('pgCcAVencer', moeda(_cardAVencer().total));
 
-  // Contas a pagar no mês (pendentes) = finance pendente + fornecedores pendentes, dentro do mês
-  const contasPendentesMes = finance.filter(f=>f.status!=='Pago' && f.status!=='Cancelada' && String(f.data||'').slice(0,7)===mesRef);
-  const fornPendentesMes = dividasFornecedores.filter(l=>!l.pago && String(l.data||'').slice(0,7)===mesRef);
-  const pagarMes = contasPendentesMes.reduce((s,f)=>s+Number(f.valor||0),0) + fornPendentesMes.reduce((s,l)=>s+Number(l.valor||0),0);
+  // 2.4 Renda
+  const renda=_cardRenda();
+  setTxt('pgRendaBruto', moeda(renda.totalBruto));
+  setTxt('pgRendaLiquido', moeda(renda.totalLiquido));
+  setTxt('pgRendaMargem', renda.margemGeral.toFixed(1)+'%');
 
-  const saldoProjetado = saldoAtual - pagarMes;
-
-  const listaF = _listaFiados();
-  const aReceberFiados = listaF.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
-  const aReceberCR = contasReceber.filter(cr=>cr.status!=='Recebido'&&cr.status!=='Cancelado').reduce((s,cr)=>s+Number(cr.valor||0),0);
-  const aReceber = aReceberFiados + aReceberCR;
-
-  setTxt('pgSaldoAtual', moeda(saldoAtual));
-  setTxt('pgRecebidoMes', moeda(recebidoMes));
-  setTxt('pgDespesasMes', moeda(despesasMes));
-  setTxt('pgSaldoMes', moeda(saldoMes));
-  setTxt('pgPagarMes', moeda(pagarMes));
-  setTxt('pgSaldoProjetado', moeda(saldoProjetado));
-  setTxt('pgAReceber', moeda(aReceber));
-
-  const pgSaldoMesEl=document.getElementById('pgSaldoMes'); if(pgSaldoMesEl) pgSaldoMesEl.style.color = saldoMes>=0?'#166534':'#991b1b';
-  const pgProjEl=document.getElementById('pgSaldoProjetado'); if(pgProjEl) pgProjEl.style.color = saldoProjetado>=0?'#166534':'#991b1b';
-
-  // ---- Comparativo com mês anterior ----
-  const mesAnt = _mesAnteriorISO(mesRef);
-  const recebidoAnt = _entradasDoMes(mesAnt);
-  let compTxt='—';
-  if(recebidoAnt>0){
-    const variacao = ((recebidoMes-recebidoAnt)/recebidoAnt)*100;
-    const seta = variacao>=0?'▲':'▼';
-    compTxt = `${seta} ${Math.abs(variacao).toFixed(0)}% vs mês anterior`;
-    const el=document.getElementById('pgComparativo'); if(el) el.style.color = variacao>=0?'#166534':'#991b1b';
-  } else if(recebidoMes>0){
-    compTxt = 'Sem base do mês anterior';
-  }
-  setTxt('pgComparativo', compTxt);
-
-  // ---- Alertas do dia (vencidas / hoje / 7 dias) ----
-  const contasVencidas = finance.filter(f=>f.status==='Vencido');
-  const fornVencidos = dividasFornecedores.filter(l=>!l.pago && _diasAteVencimento(l.data)<0);
-  const vencidasValor = contasVencidas.reduce((s,f)=>s+Number(f.valor||0),0) + fornVencidos.reduce((s,l)=>s+Number(l.valor||0),0);
-  const vencidasQtd = contasVencidas.length + fornVencidos.length;
-  setTxt('pgVencidasValor', moeda(vencidasValor));
-  setTxt('pgVencidasQtd', vencidasQtd+' conta'+(vencidasQtd!==1?'s':''));
-
-  const pagarHojeVal = finance.filter(f=>f.status!=='Pago' && f.status!=='Cancelada' && String(f.data||'').slice(0,10)===hoje).reduce((s,f)=>s+Number(f.valor||0),0)
-    + dividasFornecedores.filter(l=>!l.pago && String(l.data||'').slice(0,10)===hoje).reduce((s,l)=>s+Number(l.valor||0),0);
-  setTxt('pgPagarHoje', moeda(pagarHojeVal));
-
-  const em7 = finance.filter(f=>f.status!=='Pago'&&f.status!=='Cancelada').filter(f=>{const d=_diasAteVencimento(f.data); return d>=0&&d<=7;}).reduce((s,f)=>s+Number(f.valor||0),0)
-    + dividasFornecedores.filter(l=>!l.pago).filter(l=>{const d=_diasAteVencimento(l.data); return d>=0&&d<=7;}).reduce((s,l)=>s+Number(l.valor||0),0);
-  setTxt('pgPagar7dias', moeda(em7));
-
+  const mesRef = mesAtualISO();
   // ---- Gráfico Entradas × Saídas (6 meses) ----
   const linhas6=[];
   let m=mesRef;
@@ -3130,33 +3301,6 @@ function renderPainelGeral(){
       <div style="background:#f3f4f6;height:8px;border-radius:4px;overflow:hidden"><div style="background:${cores[i%cores.length]};height:100%;width:${pct}%"></div></div>
     </div>`;
   }).join('') : '<p class="muted">Nenhuma despesa registrada neste mês.</p>';
-
-  // ---- Próximos vencimentos ----
-  const proxVenc = [
-    ...finance.filter(f=>f.status!=='Pago'&&f.status!=='Cancelada').map(f=>({data:f.data, desc:f.descricao, valor:f.valor})),
-    ...dividasFornecedores.filter(l=>!l.pago).map(l=>({data:l.data, desc:'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):''), valor:l.valor}))
-  ].filter(x=>x.data).sort((a,b)=>String(a.data).localeCompare(String(b.data))).slice(0,6);
-  document.getElementById('pgProximosVencimentos').innerHTML = proxVenc.length ? '<table class="rec-table"><tbody>'+
-    proxVenc.map(v=>{const d=_diasAteVencimento(v.data); const cor=d<0?'#991b1b':d===0?'#c2660a':'#374151'; return `<tr><td style="color:${cor}">${dataBR(v.data)}</td><td>${escapeHtml(v.desc||'-')}</td><td style="text-align:right">${moeda(v.valor)}</td></tr>`;}).join('')+
-    '</tbody></table>' : '<p class="muted">Nenhum vencimento pendente. 🎉</p>';
-
-  // ---- Próximos recebimentos (parcelas de fiados) ----
-  const proxReceb=[];
-  listaF.forEach(o=>{ (o.parcelasAcordo||[]).filter(p=>!p.pago).forEach(p=>proxReceb.push({data:p.data, cliente:o.cliente, valor:p.valor})); });
-  contasReceber.filter(cr=>cr.status!=='Recebido'&&cr.status!=='Cancelado').forEach(cr=>proxReceb.push({data:cr.previsao, cliente:cr.cliente, valor:cr.valor}));
-  proxReceb.sort((a,b)=>String(a.data).localeCompare(String(b.data)));
-  document.getElementById('pgProximosRecebimentos').innerHTML = proxReceb.length ? '<table class="rec-table"><tbody>'+
-    proxReceb.slice(0,6).map(r=>`<tr><td>${dataBR(r.data)}</td><td>${escapeHtml(r.cliente||'-')}</td><td style="text-align:right">${moeda(r.valor)}</td></tr>`).join('')+
-    '</tbody></table>' : '<p class="muted">Nenhum recebimento agendado.</p>';
-
-  // ---- Alertas ----
-  const alertas=[];
-  if(vencidasQtd>0) alertas.push(`🔴 Você tem <strong>${vencidasQtd}</strong> conta(s) vencida(s), somando <strong>${moeda(vencidasValor)}</strong>.`);
-  if(pagarHojeVal>0) alertas.push(`🟡 <strong>${moeda(pagarHojeVal)}</strong> vence(m) hoje.`);
-  const fiadosVencidos = listaF.filter(o=>_statusAcordo(o)==='Vencido');
-  if(fiadosVencidos.length>0) alertas.push(`🔵 <strong>${fiadosVencidos.length}</strong> cliente(s) com fiado vencido — vale cobrar.`);
-  if(saldoProjetado<0) alertas.push(`🔴 O saldo projetado pro fim do mês está <strong>negativo</strong> (${moeda(saldoProjetado)}). Atenção ao caixa.`);
-  document.getElementById('pgAlertas').innerHTML = alertas.length ? alertas.map(a=>`<div style="padding:8px 0;border-bottom:1px solid #f3f4f6">${a}</div>`).join('') : '<p class="muted">Nenhum alerta no momento. Tudo em ordem. ✅</p>';
 }
 function renderRelatorios(){
   if(!document.getElementById('relFluxoMensal'))return;
