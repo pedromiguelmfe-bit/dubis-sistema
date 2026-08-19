@@ -567,11 +567,12 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
   <div id="finResumo" class="finance-subsection">
     <div class="panel" style="margin-top:0">
       <h3>Cadastrar Conta a Pagar</h3>
-      <p class="muted">Registre rapidamente uma conta. Se ela se repete todo mês (aluguel, mensalidade, assinatura), marque "Mensal" — ela entra sozinha em Contas a Pagar todo mês, sem precisar cadastrar de novo.</p>
+      <p class="muted">Registre rapidamente uma conta. "Mensal" é pra despesa fixa do negócio (aluguel, mensalidade) que repete sempre com o mesmo valor. "Parcelado" é pra quando você sabe o valor e a data de cada parcela.</p>
 
       <div class="cp-filtros">
         <button class="cp-filtro ativo" id="ccTipoBtnVariavel" onclick="ccSelecionarTipo('Variável')">Variável (uma vez)</button>
-        <button class="cp-filtro" id="ccTipoBtnMensal" onclick="ccSelecionarTipo('Mensal')">Mensal (repete todo mês)</button>
+        <button class="cp-filtro" id="ccTipoBtnParcelado" onclick="ccSelecionarTipo('Parcelado')">Parcelado (várias datas)</button>
+        <button class="cp-filtro" id="ccTipoBtnMensal" onclick="ccSelecionarTipo('Mensal')">Mensal (despesa fixa, repete sempre)</button>
       </div>
       <input type="hidden" id="ccTipo" value="Variável">
 
@@ -579,10 +580,25 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
         <div><label>Fornecedor (opcional)</label><input id="ccFornecedor" list="dtFornecedoresConhecidos" placeholder="Escolha um já cadastrado ou digite um novo"><datalist id="dtFornecedoresConhecidos"></datalist></div>
         <div><label>Categoria (opcional)</label><select id="ccCategoria"></select></div>
         <div style="grid-column:1/-1"><label>Descrição</label><input id="ccDescricao" placeholder="Ex: Aluguel, Água, ou o que estiver sendo cobrado"></div>
+      </div>
+
+      <div class="grid2" id="ccWrapValorUnico">
         <div><label>Valor</label><input id="ccValor" type="number" step="0.01"></div>
         <div><label id="ccLabelData">Vencimento</label><input id="ccVencimento" type="date"></div>
-        <div id="ccWrapAteQuando" style="display:none"><label>Repetir até quando (opcional)</label><input id="ccAteQuando" type="date"></div>
+        <div id="ccWrapAteQuando" style="display:none;grid-column:1/-1"><label>Repetir até quando (opcional)</label><input id="ccAteQuando" type="date"></div>
       </div>
+
+      <div id="ccWrapParcelado" style="display:none">
+        <div style="max-width:220px"><label>Quantidade de parcelas</label><input id="ccQtdParcelas" type="number" min="2" placeholder="Ex: 5" oninput="ccRenderLinhasParcelas()"></div>
+        <p class="muted" style="margin:8px 0 0">Informe o valor e a data de vencimento de cada parcela.</p>
+        <div style="display:grid;grid-template-columns:.6fr 1fr 1fr;gap:8px;margin-top:8px">
+          <small style="font-weight:800;text-transform:uppercase;color:#6b7280">Parcela</small>
+          <small style="font-weight:800;text-transform:uppercase;color:#6b7280">Valor</small>
+          <small style="font-weight:800;text-transform:uppercase;color:#6b7280">Vencimento</small>
+        </div>
+        <div id="ccLinhasParcelas"></div>
+      </div>
+
       <div class="actions">
         <button class="dark" onclick="salvarCadastroContaRapido()">Salvar conta</button>
       </div>
@@ -590,7 +606,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 
     <div class="panel">
       <div class="cp-topo">
-        <div><h3>Contas mensais programadas</h3><p class="muted">O que está marcado como "Mensal" já entra sozinho em Contas a Pagar, todo mês.</p></div>
+        <div><h3>Contas mensais programadas</h3><p class="muted">Despesas fixas marcadas como "Mensal" — já entram sozinhas em Contas a Pagar, todo mês.</p></div>
         <button class="gray" onclick="abrirRecorrentes()">Gerenciar todas</button>
       </div>
       <div id="listaRecorrentesResumo"></div>
@@ -2536,9 +2552,33 @@ function renderRecorrentesResumo(){
 function ccSelecionarTipo(tipo){
   document.getElementById('ccTipo').value=tipo;
   document.getElementById('ccTipoBtnVariavel').classList.toggle('ativo', tipo==='Variável');
+  document.getElementById('ccTipoBtnParcelado').classList.toggle('ativo', tipo==='Parcelado');
   document.getElementById('ccTipoBtnMensal').classList.toggle('ativo', tipo==='Mensal');
+  document.getElementById('ccWrapValorUnico').style.display = tipo==='Parcelado' ? 'none' : 'grid';
+  document.getElementById('ccWrapParcelado').style.display = tipo==='Parcelado' ? 'block' : 'none';
   document.getElementById('ccLabelData').innerText = tipo==='Mensal' ? 'Dia do vencimento (repete todo mês)' : 'Vencimento';
   document.getElementById('ccWrapAteQuando').style.display = tipo==='Mensal' ? 'block' : 'none';
+  if(tipo==='Parcelado') ccRenderLinhasParcelas();
+}
+function ccRenderLinhasParcelas(){
+  const cont=document.getElementById('ccLinhasParcelas');
+  if(!cont)return;
+  const qtd=Math.max(0, Number(document.getElementById('ccQtdParcelas').value||0));
+  // preserva o que já foi digitado nas linhas existentes ao mudar a quantidade
+  const existentes=[];
+  cont.querySelectorAll('.cc-linha-parcela').forEach(row=>{
+    existentes.push({valor:row.querySelector('.cc-parc-valor').value, data:row.querySelector('.cc-parc-data').value});
+  });
+  let html='';
+  for(let i=0;i<qtd;i++){
+    const ex=existentes[i]||{};
+    html += `<div class="cc-linha-parcela" style="display:grid;grid-template-columns:.6fr 1fr 1fr;gap:8px;margin-top:6px;align-items:center">
+      <small class="muted">${i+1}ª de ${qtd}</small>
+      <input class="cc-parc-valor" type="number" step="0.01" placeholder="Valor" value="${escapeHtml(ex.valor||'')}">
+      <input class="cc-parc-data" type="date" value="${escapeHtml(ex.data||'')}">
+    </div>`;
+  }
+  cont.innerHTML=html;
 }
 function limparFormCadastroRapido(){
   document.getElementById('ccFornecedor').value='';
@@ -2547,21 +2587,35 @@ function limparFormCadastroRapido(){
   document.getElementById('ccVencimento').value='';
   document.getElementById('ccCategoria').value='';
   document.getElementById('ccAteQuando').value='';
+  document.getElementById('ccQtdParcelas').value='';
+  document.getElementById('ccLinhasParcelas').innerHTML='';
   ccSelecionarTipo('Variável');
 }
 async function salvarCadastroContaRapido(){
   const tipo=document.getElementById('ccTipo').value;
   const fornecedor=document.getElementById('ccFornecedor').value.trim();
   let descricao=document.getElementById('ccDescricao').value.trim();
-  const valor=Number(document.getElementById('ccValor').value||0);
-  const vencimento=document.getElementById('ccVencimento').value;
   const categoria=document.getElementById('ccCategoria').value.trim();
-  const ateQuando=document.getElementById('ccAteQuando').value;
 
   if(!descricao && !fornecedor){ alert('Informe uma descrição ou um fornecedor.'); return; }
   if(!descricao) descricao=fornecedor;
-  if(!valor || valor<=0){ alert('Informe o valor.'); return; }
-  if(!vencimento){ alert(tipo==='Mensal' ? 'Informe uma data — o dia dela será usado como o dia do vencimento todo mês.' : 'Informe o vencimento.'); return; }
+
+  let parcelasParceladas=null;
+  let valor=0, vencimento='', ateQuando='';
+
+  if(tipo==='Parcelado'){
+    const qtd=Number(document.getElementById('ccQtdParcelas').value||0);
+    if(qtd<2){ alert('Informe pelo menos 2 parcelas.'); return; }
+    const linhas=[...document.querySelectorAll('.cc-linha-parcela')];
+    parcelasParceladas=linhas.map(row=>({valor:Number(row.querySelector('.cc-parc-valor').value||0), data:row.querySelector('.cc-parc-data').value}));
+    if(parcelasParceladas.some(p=>!p.valor||p.valor<=0||!p.data)){ alert('Preencha o valor e a data de vencimento de todas as parcelas.'); return; }
+  } else {
+    valor=Number(document.getElementById('ccValor').value||0);
+    vencimento=document.getElementById('ccVencimento').value;
+    ateQuando=document.getElementById('ccAteQuando').value;
+    if(!valor || valor<=0){ alert('Informe o valor.'); return; }
+    if(!vencimento){ alert(tipo==='Mensal' ? 'Informe uma data — o dia dela será usado como o dia do vencimento todo mês.' : 'Informe o vencimento.'); return; }
+  }
 
   try{
     if(tipo==='Mensal'){
@@ -2569,10 +2623,17 @@ async function salvarCadastroContaRapido(){
       recorrentes.push({id:Date.now()+Math.floor(Math.random()*1000), ativa:true, descricao, categoria, fornecedor, dia, valor, formaPagamento:'Dinheiro', dataInicial:vencimento, dataFinal:ateQuando||''});
       gerarHorizonteRecorrentes(12);
       if(typeof renderRecorrentes==='function') renderRecorrentes();
+    } else if(tipo==='Parcelado'){
+      const qtd=parcelasParceladas.length;
+      parcelasParceladas.forEach((p,idx)=>{
+        finance.push({id:Date.now()+idx+Math.floor(Math.random()*100000), origem:'Manual', status:'', descricao, categoria, fornecedor, valor:p.valor, data:p.data, tipo:'Variável', parcelaAtual:String(idx+1), totalParcelas:String(qtd)});
+      });
     } else {
       finance.push({id:Date.now()+Math.floor(Math.random()*100000), origem:'Manual', status:'', descricao, categoria, fornecedor, valor, data:vencimento, tipo:'Variável'});
     }
-    const mensagem = tipo==='Mensal' ? 'Conta mensal cadastrada! Ela já foi programada pros próximos 12 meses em Contas a Pagar.' : 'Conta cadastrada com sucesso!';
+    const mensagem = tipo==='Mensal' ? 'Conta mensal cadastrada! Ela já foi programada pros próximos 12 meses em Contas a Pagar.'
+      : tipo==='Parcelado' ? 'Conta parcelada cadastrada! Todas as parcelas já estão em Contas a Pagar.'
+      : 'Conta cadastrada com sucesso!';
     limparFormCadastroRapido();
     renderCadastroRapido();
     renderFinanceiro(window.filtroAtual||'todos');
