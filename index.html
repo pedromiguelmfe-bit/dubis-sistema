@@ -425,18 +425,79 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <h3>Financeiro da Dubis</h3>
     <p class="muted">Organizado em abas: resumo, pagamentos, entradas e saídas.</p>
     <div class="finance-tabs">
-      <button class="activeTab" onclick="abrirFinanceiro('finResumo', this)">Resumo</button>
+      <button class="activeTab" onclick="abrirFinanceiro('finPainel', this)">Painel Geral</button>
+      <button onclick="abrirFinanceiro('finResumo', this)">Resumo</button>
       <button onclick="abrirFinanceiro('finPagamentos', this)">Pagamentos</button>
       <button onclick="abrirFinanceiro('finEntradas', this)">Entradas</button>
       <button onclick="abrirFinanceiro('finSaidas', this)">Saídas</button>
       <button onclick="abrirFinanceiro('finMovimentacoes', this)">Movimentações e Resultados</button>
       <button onclick="abrirFinanceiro('finCalendario', this)">Calendário Financeiro</button>
+      <button onclick="abrirFinanceiro('finCategorias', this)">Categorias</button>
       <button onclick="abrirFinanceiro('finRelatorios', this)">Relatórios</button>
       <button class="dark" onclick="gerarRelatorioMensal()">Relatório mensal PDF</button>
     </div>
   </div>
 
-  <div id="finResumo" class="finance-subsection active">
+  <div id="finPainel" class="finance-subsection active">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="gray" onclick="painelMudarMes(-1)">‹</button>
+        <strong id="painelMesLabel" style="font-size:16px;min-width:150px;text-align:center">—</strong>
+        <button class="gray" onclick="painelMudarMes(1)">›</button>
+      </div>
+      <button class="gray" onclick="painelMesAtual()">Mês atual</button>
+    </div>
+
+    <div class="os-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+      <div class="os-card"><small class="muted">Saldo atual em conta</small><strong id="pgSaldoAtual" style="font-size:22px">R$ 0,00</strong></div>
+      <div class="os-card"><small class="muted">Recebido no mês</small><strong id="pgRecebidoMes" style="font-size:22px;color:#166534">R$ 0,00</strong></div>
+      <div class="os-card"><small class="muted">Despesas no mês</small><strong id="pgDespesasMes" style="font-size:22px;color:#991b1b">R$ 0,00</strong></div>
+      <div class="os-card"><small class="muted">Saldo do mês</small><strong id="pgSaldoMes" style="font-size:22px">R$ 0,00</strong></div>
+      <div class="os-card"><small class="muted">A pagar no mês</small><strong id="pgPagarMes" style="font-size:22px">R$ 0,00</strong></div>
+      <div class="os-card"><small class="muted">Saldo projetado (fim do mês)</small><strong id="pgSaldoProjetado" style="font-size:22px">R$ 0,00</strong></div>
+      <div class="os-card"><small class="muted">Ainda a receber (fiados)</small><strong id="pgAReceber" style="font-size:22px;color:#c2660a">R$ 0,00</strong></div>
+      <div class="os-card"><small class="muted">Comparativo com mês anterior</small><strong id="pgComparativo" style="font-size:18px">—</strong></div>
+    </div>
+
+    <div class="os-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-top:14px">
+      <div class="os-card" style="border-left:4px solid #ef4444"><small class="muted">Contas vencidas</small><strong id="pgVencidasValor" style="font-size:18px;color:#991b1b">R$ 0,00</strong><small class="muted" id="pgVencidasQtd">0 contas</small></div>
+      <div class="os-card" style="border-left:4px solid #f59e0b"><small class="muted">A pagar hoje</small><strong id="pgPagarHoje" style="font-size:18px">R$ 0,00</strong></div>
+      <div class="os-card" style="border-left:4px solid #3b82f6"><small class="muted">Próximos 7 dias</small><strong id="pgPagar7dias" style="font-size:18px">R$ 0,00</strong></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px" id="pgGraficosWrap">
+      <div class="panel" style="margin-top:0">
+        <h4 style="margin-bottom:10px">Entradas × Saídas (últimos 6 meses)</h4>
+        <div id="pgGraficoFluxo"></div>
+      </div>
+      <div class="panel" style="margin-top:0">
+        <h4 style="margin-bottom:10px">Despesas por categoria (mês)</h4>
+        <div id="pgGraficoCategorias"></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+      <div class="panel" style="margin-top:0">
+        <h4 style="margin-bottom:10px">Próximos vencimentos</h4>
+        <div id="pgProximosVencimentos"></div>
+      </div>
+      <div class="panel" style="margin-top:0">
+        <h4 style="margin-bottom:10px">Próximos recebimentos</h4>
+        <div id="pgProximosRecebimentos"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4 style="margin-bottom:10px">⚠️ Alertas</h4>
+      <div id="pgAlertas"></div>
+    </div>
+
+    <div style="text-align:center;margin-top:10px">
+      <button class="gray" onclick="abrirFinanceiro('finCalendario', document.querySelector('.finance-tabs button:nth-child(7)'))">Ver Calendário Financeiro completo →</button>
+    </div>
+  </div>
+
+  <div id="finResumo" class="finance-subsection">
     <div class="cards">
       <div class="card"><small>Precisa pagar no filtro</small><h3 id="finTotalPagar">R$ 0,00</h3></div>
       <div class="card"><small>Saldo do filtro</small><h3 id="finSaldoFiltro">R$ 0,00</h3></div>
@@ -580,9 +641,9 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <input type="hidden" id="mcIndex">
       <div class="grid2">
         <div style="grid-column:1/-1"><label>Descrição</label><input id="mcDescricao" placeholder="Ex: Aluguel, Fornecedor de peças..."></div>
-        <div><label>Categoria</label><input id="mcCategoria" placeholder="Ex: Estrutura, Peças, Marketing"></div>
+        <div><label>Categoria</label><select id="mcCategoria"></select></div>
         <div><label>Fornecedor</label><input id="mcFornecedor" placeholder="Nome do fornecedor"></div>
-        <div><label>Centro de custo</label><input id="mcCentroCusto" placeholder="Ex: Oficina, Administração"></div>
+        <div><label>Centro de custo</label><select id="mcCentroCusto"></select></div>
         <div><label>Valor (R$)</label><input id="mcValor" type="number" step="0.01" placeholder="Deixe em branco se ainda não sabe"></div>
         <div><label>Data de vencimento</label><input id="mcData" type="date"></div>
         <div><label>Forma de pagamento prevista</label><select id="mcFormaPagamento"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
@@ -822,6 +883,54 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <div id="calFinDiaConteudo"></div>
       <div class="actions">
         <button class="gray" onclick="calFinFecharDia()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="finCategorias" class="finance-subsection">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="panel" style="margin-top:0">
+        <div class="cp-topo">
+          <div><h3>Categorias</h3><p class="muted">Usadas pra classificar despesas e receitas. Você pode criar, editar e desativar — as desativadas somem dos formulários, mas os lançamentos antigos continuam intactos.</p></div>
+          <button class="btn-nova" onclick="abrirNovaCategoria()">+ Nova categoria</button>
+        </div>
+        <div id="listaCategorias"></div>
+      </div>
+      <div class="panel" style="margin-top:0">
+        <div class="cp-topo">
+          <div><h3>Centros de custo</h3><p class="muted">Pra separar gastos por área (Oficina, Administração, Lava-car...). Opcional.</p></div>
+          <button class="btn-nova" onclick="abrirNovoCentroCusto()">+ Novo centro</button>
+        </div>
+        <div id="listaCentrosCusto"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalCategoriaOverlay">
+    <div class="cp-modal">
+      <h3 id="catModalTitulo">Nova categoria</h3>
+      <input type="hidden" id="catId">
+      <div class="grid2">
+        <div style="grid-column:1/-1"><label>Nome</label><input id="catNome" placeholder="Ex: Marketing"></div>
+        <div style="grid-column:1/-1"><label>Descrição (opcional)</label><input id="catDescricao" placeholder="Ex: Anúncios, panfletos..."></div>
+      </div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalCategoria()">Cancelar</button>
+        <button class="dark" onclick="salvarCategoria()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalCentroCustoOverlay">
+    <div class="cp-modal">
+      <h3 id="ccModalTitulo">Novo centro de custo</h3>
+      <input type="hidden" id="ccId">
+      <div class="grid2">
+        <div style="grid-column:1/-1"><label>Nome</label><input id="ccNome" placeholder="Ex: Oficina"></div>
+      </div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalCentroCusto()">Cancelar</button>
+        <button class="dark" onclick="salvarCentroCusto()">Salvar</button>
       </div>
     </div>
   </div>
@@ -1071,6 +1180,17 @@ let estoque=[];
 let saidas=[];
 let entradas=[];
 let dividasFornecedores=[];
+let categoriasFin=[];
+let centrosCusto=[];
+const CATEGORIAS_PADRAO = [
+  {id:'cat_pessoal', nome:'Pessoal', descricao:'Salários, benefícios, pró-labore', ativo:true},
+  {id:'cat_fornecedores', nome:'Fornecedores', descricao:'Peças, materiais, serviços terceirizados', ativo:true},
+  {id:'cat_impostos', nome:'Impostos', descricao:'Impostos, taxas e obrigações', ativo:true},
+  {id:'cat_estrutura', nome:'Estrutura', descricao:'Aluguel, energia, água, internet', ativo:true},
+  {id:'cat_veiculos', nome:'Veículos', descricao:'Combustível, manutenção, seguro, documentação', ativo:true},
+  {id:'cat_financeiro', nome:'Financeiro', descricao:'Juros, tarifas bancárias e financiamentos', ativo:true},
+  {id:'cat_administrativo', nome:'Administrativo', descricao:'Sistemas, escritório e demais despesas', ativo:true}
+];
 let currentItems=[], editingQuoteId=null, editingClientId=null, editingFuncId=null;
 
 const ddaItauImportado = [];
@@ -1132,6 +1252,11 @@ async function carregarDadosSalvos(){
     if(usar.entradas) entradas = usar.entradas;
     if(usar.saidas) saidas = usar.saidas;
     if(usar.dividasFornecedores) dividasFornecedores = usar.dividasFornecedores;
+    if(usar.categoriasFin) categoriasFin = usar.categoriasFin;
+    if(usar.centrosCusto) centrosCusto = usar.centrosCusto;
+    // Primeira vez que o sistema roda com o módulo de categorias: semeia as categorias
+    // padrão da spec pra loja não começar do zero (pode editar/desativar depois).
+    if(!categoriasFin || categoriasFin.length===0){ categoriasFin = JSON.parse(JSON.stringify(CATEGORIAS_PADRAO)); }
     // Migração: o formato antigo agrupava parcelas dentro de uma "dívida" (valor total
     // dividido em N parcelas). O novo formato é uma lista solta de lançamentos, um por
     // linha, igual à planilha do fornecedor — sem exigir um valor total combinado antes.
@@ -1155,7 +1280,7 @@ async function carregarDadosSalvos(){
 
 /* ===== Salvamento com aviso visível + cópia de segurança local ===== */
 function _coletarDados(){
-  return {quotes, serviceOrders, clients, finance, entradas, saidas, funcionarios, servicosConcluidos, recorrentes, estoque, dividasFornecedores};
+  return {quotes, serviceOrders, clients, finance, entradas, saidas, funcionarios, servicosConcluidos, recorrentes, estoque, dividasFornecedores, categoriasFin, centrosCusto};
 }
 function _salvarBackupLocal(dados, ts){
   try{ localStorage.setItem('dubis_backup', JSON.stringify({dados, ts})); }catch(e){}
@@ -1343,6 +1468,8 @@ function abrirFinanceiro(id,btn){
   // (e deixava a troca de aba lenta). Só Relatórios não faz parte dessa cadeia.
   renderFinanceiro(window.filtroAtual||'todos');
   renderRelatorios();
+  renderPainelGeral();
+  renderCategorias();
 }
 
 function atualizarDashboard(){
@@ -1350,10 +1477,15 @@ function atualizarDashboard(){
   const hoje = dataHojeISO();
   const mes = hoje.slice(0,7); // AAAA-MM
 
+  const fornPendentes = dividasFornecedores.filter(l=>!l.pago);
+
   const contasHoje = finance.filter(f=>f.status!=='Pago' && String(f.data||'').slice(0,10)===hoje);
-  const pagarHoje = contasHoje.reduce((s,f)=>s+Number(f.valor||0),0);
-  const vencidas  = finance.filter(f=>f.status==='Vencido').reduce((s,f)=>s+Number(f.valor||0),0);
-  const pagasMes  = finance.filter(f=>f.status==='Pago' && String(f.data||'').slice(0,7)===mes).reduce((s,f)=>s+Number(f.valor||0),0);
+  const fornHoje = fornPendentes.filter(l=>String(l.data||'').slice(0,10)===hoje);
+  const pagarHoje = contasHoje.reduce((s,f)=>s+Number(f.valor||0),0) + fornHoje.reduce((s,l)=>s+Number(l.valor||0),0);
+  const vencidas  = finance.filter(f=>f.status==='Vencido').reduce((s,f)=>s+Number(f.valor||0),0)
+                   + fornPendentes.filter(l=>_diasAteVencimento(l.data)<0).reduce((s,l)=>s+Number(l.valor||0),0);
+  const pagasMes  = finance.filter(f=>f.status==='Pago' && String(f.data||'').slice(0,7)===mes).reduce((s,f)=>s+Number(f.valor||0),0)
+                   + dividasFornecedores.filter(l=>l.pago && String(l.dataPagamento||l.data||'').slice(0,7)===mes).reduce((s,l)=>s+Number(l.valor||0),0);
 
   const orcamentosDia    = quotes.filter(q=>String(q.createdAt||'').slice(0,10)===hoje).length;
   const orcamentosAberto = quotes.filter(q=>q.status==='Aberto').length;
@@ -1382,7 +1514,11 @@ function atualizarDashboard(){
     dashTabelaEntradas.innerHTML = entradasHoje.length ? entradasHoje.map(e=>`<tr><td>${escapeHtml(e.descricao)}</td><td>${escapeHtml(e.forma||'-')}</td><td>${moeda(e.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma entrada hoje.</td></tr>';
   }
   if(document.getElementById('dashTabelaContasHoje')){
-    dashTabelaContasHoje.innerHTML = contasHoje.length ? contasHoje.map(c=>`<tr><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.status)}</td><td>${moeda(c.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma conta para hoje.</td></tr>';
+    const todasContasHoje = [
+      ...contasHoje.map(c=>({descricao:c.descricao, status:c.status, valor:c.valor})),
+      ...fornHoje.map(l=>({descricao:'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):''), status:'Vence hoje', valor:l.valor}))
+    ];
+    dashTabelaContasHoje.innerHTML = todasContasHoje.length ? todasContasHoje.map(c=>`<tr><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.status)}</td><td>${moeda(c.valor)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">Nenhuma conta para hoje.</td></tr>';
   }
 }
 
@@ -2288,6 +2424,261 @@ async function marcarParcelaAcordoPaga(quoteId, parcelaId){
 /* ===== Relatórios Financeiros ===== */
 function relMesAnterior(){ window.relMesRef = _mesAnteriorISO(window.relMesRef||mesAtualISO()); renderRelatorios(); }
 function relProximoMes(){ window.relMesRef = _proximoMesISO(window.relMesRef||mesAtualISO()); renderRelatorios(); }
+function painelMudarMes(delta){
+  const ref = window.painelMesRef || mesAtualISO();
+  const [a,m] = ref.split('-').map(Number);
+  const d = new Date(a, m-1+delta, 1);
+  window.painelMesRef = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  renderPainelGeral();
+}
+function painelMesAtual(){ window.painelMesRef = mesAtualISO(); renderPainelGeral(); }
+function _entradasDoMes(mesRef){
+  return entradas.filter(e=>String(e.data||'').slice(0,7)===mesRef)
+    .reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
+}
+function _saidasDoMes(mesRef){
+  return saidas.filter(s=>String(s.data||'').slice(0,7)===mesRef).reduce((s,x)=>s+Number(x.valor||0),0);
+}
+/* ===== Categorias e Centros de Custo ===== */
+function categoriasAtivas(){ return categoriasFin.filter(c=>c.ativo!==false); }
+function optionsCategorias(selecionada){
+  return '<option value="">Selecione...</option>' + categoriasAtivas().map(c=>`<option value="${escapeHtml(c.nome)}" ${selecionada===c.nome?'selected':''}>${escapeHtml(c.nome)}</option>`).join('')
+    + (selecionada && !categoriasAtivas().some(c=>c.nome===selecionada) ? `<option value="${escapeHtml(selecionada)}" selected>${escapeHtml(selecionada)} (antiga)</option>` : '');
+}
+function optionsCentrosCusto(selecionado){
+  return '<option value="">Nenhum</option>' + centrosCusto.filter(c=>c.ativo!==false).map(c=>`<option value="${escapeHtml(c.nome)}" ${selecionado===c.nome?'selected':''}>${escapeHtml(c.nome)}</option>`).join('')
+    + (selecionado && !centrosCusto.some(c=>c.nome===selecionado) ? `<option value="${escapeHtml(selecionado)}" selected>${escapeHtml(selecionado)} (antigo)</option>` : '');
+}
+function renderCategorias(){
+  const cont=document.getElementById('listaCategorias');
+  if(cont){
+    cont.innerHTML = categoriasFin.length ? '<table class="rec-table"><thead><tr><th>Nome</th><th>Descrição</th><th>Status</th><th>Ações</th></tr></thead><tbody>' +
+      categoriasFin.map(c=>`<tr style="${c.ativo===false?'opacity:.5':''}">
+        <td><strong>${escapeHtml(c.nome)}</strong></td>
+        <td class="muted">${escapeHtml(c.descricao||'-')}</td>
+        <td>${c.ativo===false?'<span class="badge gray">Inativa</span>':'<span class="badge green">Ativa</span>'}</td>
+        <td>
+          <button class="gray" onclick="editarCategoria('${c.id}')">Editar</button>
+          <button class="gray" onclick="alternarCategoria('${c.id}')">${c.ativo===false?'Reativar':'Desativar'}</button>
+        </td>
+      </tr>`).join('') + '</tbody></table>' : '<p class="muted">Nenhuma categoria cadastrada.</p>';
+  }
+  const contCC=document.getElementById('listaCentrosCusto');
+  if(contCC){
+    contCC.innerHTML = centrosCusto.length ? '<table class="rec-table"><thead><tr><th>Nome</th><th>Status</th><th>Ações</th></tr></thead><tbody>' +
+      centrosCusto.map(c=>`<tr style="${c.ativo===false?'opacity:.5':''}">
+        <td><strong>${escapeHtml(c.nome)}</strong></td>
+        <td>${c.ativo===false?'<span class="badge gray">Inativo</span>':'<span class="badge green">Ativo</span>'}</td>
+        <td>
+          <button class="gray" onclick="editarCentroCusto('${c.id}')">Editar</button>
+          <button class="gray" onclick="alternarCentroCusto('${c.id}')">${c.ativo===false?'Reativar':'Desativar'}</button>
+        </td>
+      </tr>`).join('') + '</tbody></table>' : '<p class="muted">Nenhum centro de custo cadastrado.</p>';
+  }
+}
+function abrirNovaCategoria(){
+  document.getElementById('catModalTitulo').innerText='Nova categoria';
+  catId.value=''; catNome.value=''; catDescricao.value='';
+  modalCategoriaOverlay.classList.add('aberto');
+}
+function editarCategoria(id){
+  const c=categoriasFin.find(x=>x.id===id); if(!c)return;
+  document.getElementById('catModalTitulo').innerText='Editar categoria';
+  catId.value=c.id; catNome.value=c.nome||''; catDescricao.value=c.descricao||'';
+  modalCategoriaOverlay.classList.add('aberto');
+}
+function fecharModalCategoria(){ modalCategoriaOverlay.classList.remove('aberto'); }
+async function salvarCategoria(){
+  const nome=catNome.value.trim();
+  if(!nome){ alert('Informe o nome da categoria.'); return; }
+  const id=catId.value;
+  try{
+    if(id){
+      const c=categoriasFin.find(x=>x.id===id);
+      if(c){ c.nome=nome; c.descricao=catDescricao.value.trim(); }
+    } else {
+      if(categoriasFin.some(c=>c.nome.toLowerCase()===nome.toLowerCase())){ alert('Já existe uma categoria com esse nome.'); return; }
+      categoriasFin.push({id:'cat_'+Date.now()+Math.floor(Math.random()*1000), nome, descricao:catDescricao.value.trim(), ativo:true});
+    }
+    fecharModalCategoria(); renderCategorias();
+    const ok=await salvarAgora();
+    if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+  }catch(e){ console.error(e); alert('ERRO ao salvar categoria: '+(e&&e.message?e.message:e)); }
+}
+async function alternarCategoria(id){
+  const c=categoriasFin.find(x=>x.id===id); if(!c)return;
+  c.ativo = c.ativo===false;
+  renderCategorias();
+  const ok=await salvarAgora();
+  if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+}
+function abrirNovoCentroCusto(){
+  document.getElementById('ccModalTitulo').innerText='Novo centro de custo';
+  ccId.value=''; ccNome.value='';
+  modalCentroCustoOverlay.classList.add('aberto');
+}
+function editarCentroCusto(id){
+  const c=centrosCusto.find(x=>x.id===id); if(!c)return;
+  document.getElementById('ccModalTitulo').innerText='Editar centro de custo';
+  ccId.value=c.id; ccNome.value=c.nome||'';
+  modalCentroCustoOverlay.classList.add('aberto');
+}
+function fecharModalCentroCusto(){ modalCentroCustoOverlay.classList.remove('aberto'); }
+async function salvarCentroCusto(){
+  const nome=ccNome.value.trim();
+  if(!nome){ alert('Informe o nome do centro de custo.'); return; }
+  const id=ccId.value;
+  try{
+    if(id){
+      const c=centrosCusto.find(x=>x.id===id);
+      if(c){ c.nome=nome; }
+    } else {
+      if(centrosCusto.some(c=>c.nome.toLowerCase()===nome.toLowerCase())){ alert('Já existe um centro de custo com esse nome.'); return; }
+      centrosCusto.push({id:'cc_'+Date.now()+Math.floor(Math.random()*1000), nome, ativo:true});
+    }
+    fecharModalCentroCusto(); renderCategorias();
+    const ok=await salvarAgora();
+    if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+  }catch(e){ console.error(e); alert('ERRO ao salvar centro de custo: '+(e&&e.message?e.message:e)); }
+}
+async function alternarCentroCusto(id){
+  const c=centrosCusto.find(x=>x.id===id); if(!c)return;
+  c.ativo = c.ativo===false;
+  renderCategorias();
+  const ok=await salvarAgora();
+  if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+}
+
+function renderPainelGeral(){
+  if(!document.getElementById('finPainel'))return;
+  finance.forEach(statusAutomaticoConta);
+  const mesRef = window.painelMesRef || mesAtualISO();
+  const hoje = dataHojeISO();
+  const [ano, mesN] = mesRef.split('-').map(Number);
+  const fimMesISO = mesRef+'-'+String(_ultimoDiaMes(ano,mesN)).padStart(2,'0');
+  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
+
+  const lbl=_mesLabelPt(mesRef);
+  setTxt('painelMesLabel', lbl.charAt(0).toUpperCase()+lbl.slice(1));
+
+  // ---- Indicadores principais ----
+  const recebidoMes = _entradasDoMes(mesRef);
+  const despesasMes = _saidasDoMes(mesRef);
+  const saldoMes = recebidoMes - despesasMes;
+
+  // Saldo atual em conta = todas entradas - todas saídas até hoje (histórico acumulado)
+  const totalEntradasHist = entradas.reduce((s,e)=>s+Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0),0);
+  const totalSaidasHist = saidas.reduce((s,x)=>s+Number(x.valor||0),0);
+  const saldoAtual = totalEntradasHist - totalSaidasHist;
+
+  // Contas a pagar no mês (pendentes) = finance pendente + fornecedores pendentes, dentro do mês
+  const contasPendentesMes = finance.filter(f=>f.status!=='Pago' && String(f.data||'').slice(0,7)===mesRef);
+  const fornPendentesMes = dividasFornecedores.filter(l=>!l.pago && String(l.data||'').slice(0,7)===mesRef);
+  const pagarMes = contasPendentesMes.reduce((s,f)=>s+Number(f.valor||0),0) + fornPendentesMes.reduce((s,l)=>s+Number(l.valor||0),0);
+
+  const saldoProjetado = saldoAtual - pagarMes;
+
+  const listaF = _listaFiados();
+  const aReceber = listaF.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
+
+  setTxt('pgSaldoAtual', moeda(saldoAtual));
+  setTxt('pgRecebidoMes', moeda(recebidoMes));
+  setTxt('pgDespesasMes', moeda(despesasMes));
+  setTxt('pgSaldoMes', moeda(saldoMes));
+  setTxt('pgPagarMes', moeda(pagarMes));
+  setTxt('pgSaldoProjetado', moeda(saldoProjetado));
+  setTxt('pgAReceber', moeda(aReceber));
+
+  const pgSaldoMesEl=document.getElementById('pgSaldoMes'); if(pgSaldoMesEl) pgSaldoMesEl.style.color = saldoMes>=0?'#166534':'#991b1b';
+  const pgProjEl=document.getElementById('pgSaldoProjetado'); if(pgProjEl) pgProjEl.style.color = saldoProjetado>=0?'#166534':'#991b1b';
+
+  // ---- Comparativo com mês anterior ----
+  const mesAnt = _mesAnteriorISO(mesRef);
+  const recebidoAnt = _entradasDoMes(mesAnt);
+  let compTxt='—';
+  if(recebidoAnt>0){
+    const variacao = ((recebidoMes-recebidoAnt)/recebidoAnt)*100;
+    const seta = variacao>=0?'▲':'▼';
+    compTxt = `${seta} ${Math.abs(variacao).toFixed(0)}% vs mês anterior`;
+    const el=document.getElementById('pgComparativo'); if(el) el.style.color = variacao>=0?'#166534':'#991b1b';
+  } else if(recebidoMes>0){
+    compTxt = 'Sem base do mês anterior';
+  }
+  setTxt('pgComparativo', compTxt);
+
+  // ---- Alertas do dia (vencidas / hoje / 7 dias) ----
+  const contasVencidas = finance.filter(f=>f.status==='Vencido');
+  const fornVencidos = dividasFornecedores.filter(l=>!l.pago && _diasAteVencimento(l.data)<0);
+  const vencidasValor = contasVencidas.reduce((s,f)=>s+Number(f.valor||0),0) + fornVencidos.reduce((s,l)=>s+Number(l.valor||0),0);
+  const vencidasQtd = contasVencidas.length + fornVencidos.length;
+  setTxt('pgVencidasValor', moeda(vencidasValor));
+  setTxt('pgVencidasQtd', vencidasQtd+' conta'+(vencidasQtd!==1?'s':''));
+
+  const pagarHojeVal = finance.filter(f=>f.status!=='Pago' && String(f.data||'').slice(0,10)===hoje).reduce((s,f)=>s+Number(f.valor||0),0)
+    + dividasFornecedores.filter(l=>!l.pago && String(l.data||'').slice(0,10)===hoje).reduce((s,l)=>s+Number(l.valor||0),0);
+  setTxt('pgPagarHoje', moeda(pagarHojeVal));
+
+  const em7 = finance.filter(f=>f.status!=='Pago').filter(f=>{const d=_diasAteVencimento(f.data); return d>=0&&d<=7;}).reduce((s,f)=>s+Number(f.valor||0),0)
+    + dividasFornecedores.filter(l=>!l.pago).filter(l=>{const d=_diasAteVencimento(l.data); return d>=0&&d<=7;}).reduce((s,l)=>s+Number(l.valor||0),0);
+  setTxt('pgPagar7dias', moeda(em7));
+
+  // ---- Gráfico Entradas × Saídas (6 meses) ----
+  const linhas6=[];
+  let m=mesRef;
+  for(let i=0;i<6;i++){ linhas6.push({m, ent:_entradasDoMes(m), sai:_saidasDoMes(m)}); m=_mesAnteriorISO(m); }
+  linhas6.reverse();
+  const maxFluxo=Math.max(1,...linhas6.map(l=>Math.max(l.ent,l.sai)));
+  document.getElementById('pgGraficoFluxo').innerHTML = linhas6.map(l=>{
+    const mlbl=_mesLabelPt(l.m).slice(0,3);
+    const pctE=Math.round((l.ent/maxFluxo)*100), pctS=Math.round((l.sai/maxFluxo)*100);
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:11px"><span>${mlbl}</span></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><div style="background:#16a34a;height:12px;border-radius:3px;width:${pctE}%;min-width:2px"></div><small class="muted">${moeda(l.ent)}</small></div>
+      <div style="display:flex;align-items:center;gap:6px"><div style="background:#ef4444;height:12px;border-radius:3px;width:${pctS}%;min-width:2px"></div><small class="muted">${moeda(l.sai)}</small></div>
+    </div>`;
+  }).join('') + '<div style="display:flex;gap:14px;margin-top:6px;font-size:11px"><span style="color:#16a34a">■ Entradas</span><span style="color:#ef4444">■ Saídas</span></div>';
+
+  // ---- Gráfico Despesas por categoria (mês) ----
+  const saidasMes = saidas.filter(s=>String(s.data||'').slice(0,7)===mesRef);
+  const porCat={};
+  saidasMes.forEach(s=>{ const c=(s.categoria||'Sem categoria').trim()||'Sem categoria'; porCat[c]=(porCat[c]||0)+Number(s.valor||0); });
+  const cats=Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
+  const totalCat=cats.reduce((s,c)=>s+c[1],0);
+  const cores=['#f59e0b','#3b82f6','#16a34a','#ef4444','#8b5cf6','#ec4899','#14b8a6','#6b7280'];
+  document.getElementById('pgGraficoCategorias').innerHTML = cats.length ? cats.map((c,i)=>{
+    const pct=totalCat>0?Math.round((c[1]/totalCat)*100):0;
+    return `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span>${escapeHtml(c[0])}</span><strong>${moeda(c[1])} · ${pct}%</strong></div>
+      <div style="background:#f3f4f6;height:8px;border-radius:4px;overflow:hidden"><div style="background:${cores[i%cores.length]};height:100%;width:${pct}%"></div></div>
+    </div>`;
+  }).join('') : '<p class="muted">Nenhuma despesa registrada neste mês.</p>';
+
+  // ---- Próximos vencimentos ----
+  const proxVenc = [
+    ...finance.filter(f=>f.status!=='Pago').map(f=>({data:f.data, desc:f.descricao, valor:f.valor})),
+    ...dividasFornecedores.filter(l=>!l.pago).map(l=>({data:l.data, desc:'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):''), valor:l.valor}))
+  ].filter(x=>x.data).sort((a,b)=>String(a.data).localeCompare(String(b.data))).slice(0,6);
+  document.getElementById('pgProximosVencimentos').innerHTML = proxVenc.length ? '<table class="rec-table"><tbody>'+
+    proxVenc.map(v=>{const d=_diasAteVencimento(v.data); const cor=d<0?'#991b1b':d===0?'#c2660a':'#374151'; return `<tr><td style="color:${cor}">${dataBR(v.data)}</td><td>${escapeHtml(v.desc||'-')}</td><td style="text-align:right">${moeda(v.valor)}</td></tr>`;}).join('')+
+    '</tbody></table>' : '<p class="muted">Nenhum vencimento pendente. 🎉</p>';
+
+  // ---- Próximos recebimentos (parcelas de fiados) ----
+  const proxReceb=[];
+  listaF.forEach(o=>{ (o.parcelasAcordo||[]).filter(p=>!p.pago).forEach(p=>proxReceb.push({data:p.data, cliente:o.cliente, valor:p.valor})); });
+  proxReceb.sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+  document.getElementById('pgProximosRecebimentos').innerHTML = proxReceb.length ? '<table class="rec-table"><tbody>'+
+    proxReceb.slice(0,6).map(r=>`<tr><td>${dataBR(r.data)}</td><td>${escapeHtml(r.cliente||'-')}</td><td style="text-align:right">${moeda(r.valor)}</td></tr>`).join('')+
+    '</tbody></table>' : '<p class="muted">Nenhum recebimento agendado.</p>';
+
+  // ---- Alertas ----
+  const alertas=[];
+  if(vencidasQtd>0) alertas.push(`🔴 Você tem <strong>${vencidasQtd}</strong> conta(s) vencida(s), somando <strong>${moeda(vencidasValor)}</strong>.`);
+  if(pagarHojeVal>0) alertas.push(`🟡 <strong>${moeda(pagarHojeVal)}</strong> vence(m) hoje.`);
+  const fiadosVencidos = listaF.filter(o=>_statusAcordo(o)==='Vencido');
+  if(fiadosVencidos.length>0) alertas.push(`🔵 <strong>${fiadosVencidos.length}</strong> cliente(s) com fiado vencido — vale cobrar.`);
+  if(saldoProjetado<0) alertas.push(`🔴 O saldo projetado pro fim do mês está <strong>negativo</strong> (${moeda(saldoProjetado)}). Atenção ao caixa.`);
+  document.getElementById('pgAlertas').innerHTML = alertas.length ? alertas.map(a=>`<div style="padding:8px 0;border-bottom:1px solid #f3f4f6">${a}</div>`).join('') : '<p class="muted">Nenhum alerta no momento. Tudo em ordem. ✅</p>';
+}
 function renderRelatorios(){
   if(!document.getElementById('relFluxoMensal'))return;
   const mesRef = window.relMesRef || mesAtualISO();
@@ -3347,12 +3738,16 @@ function gerarRelatorioMensal(){
   const fimISO = mesRef+'-'+String(_ultimoDiaMes(ano,mes)).padStart(2,'0');
 
   const contasPeriodo = finance.filter(c => String(c.data||'').slice(0,10) >= inicioISO && String(c.data||'').slice(0,10) <= fimISO);
+  const fornPendentesPeriodo = dividasFornecedores
+    .filter(l => !l.pago && String(l.data||'').slice(0,10) >= inicioISO && String(l.data||'').slice(0,10) <= fimISO)
+    .map(l => ({data:l.data, descricao:'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):''), status:_diasAteVencimento(l.data)<0?'Vencido':'A vencer', valor:l.valor}));
+  const contasPeriodoTodas = [...contasPeriodo, ...fornPendentesPeriodo];
   const entradasPeriodo = entradas.filter(e => String(e.data||'').slice(0,10) >= inicioISO && String(e.data||'').slice(0,10) <= fimISO);
   const saidasPeriodo = saidas.filter(s => String(s.data||'').slice(0,10) >= inicioISO && String(s.data||'').slice(0,10) <= fimISO);
 
-  const totalPagas = contasPeriodo.filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
-  const totalVencidas = contasPeriodo.filter(c=>c.status==='Vencido').reduce((s,c)=>s+Number(c.valor||0),0);
-  const totalAVencer = contasPeriodo.filter(c=>c.status==='A vencer').reduce((s,c)=>s+Number(c.valor||0),0);
+  const totalPagas = contasPeriodoTodas.filter(c=>c.status==='Pago').reduce((s,c)=>s+Number(c.valor||0),0);
+  const totalVencidas = contasPeriodoTodas.filter(c=>c.status==='Vencido').reduce((s,c)=>s+Number(c.valor||0),0);
+  const totalAVencer = contasPeriodoTodas.filter(c=>c.status==='A vencer').reduce((s,c)=>s+Number(c.valor||0),0);
   const totalEntradas = entradasPeriodo.reduce((s,e)=>s+Number(e.valor||0),0);
   const totalSaidas = saidasPeriodo.reduce((s,e)=>s+Number(e.valor||0),0);
   // "Saídas" já inclui as contas pagas (toda conta marcada como paga também vira uma
@@ -3360,7 +3755,7 @@ function gerarRelatorioMensal(){
   // mesmo tempo, senão as contas pagas seriam contadas em dobro.
   const saldo = totalEntradas - totalSaidas;
 
-  const linhasContas = contasPeriodo.map(c=>`<tr><td>${dataBR(c.data)}</td><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.status)}</td><td>${moeda(c.valor)}</td></tr>`).join('');
+  const linhasContas = contasPeriodoTodas.map(c=>`<tr><td>${dataBR(c.data)}</td><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.status)}</td><td>${moeda(c.valor)}</td></tr>`).join('');
   const linhasEntradas = entradasPeriodo.map(e=>`<tr><td>${dataBR(e.data)}</td><td>${escapeHtml(e.descricao)}</td><td>${escapeHtml(e.forma||'-')}</td><td>${moeda(e.valor)}</td></tr>`).join('');
   const linhasSaidas = saidasPeriodo.map(s=>`<tr><td>${dataBR(s.data)}</td><td>${escapeHtml(s.descricao)}</td><td>${escapeHtml(s.categoria||'-')}</td><td>${moeda(s.valor)}</td></tr>`).join('');
 
@@ -3701,6 +4096,7 @@ async function marcarParcelaFornecedorPaga(lancId){
     l.saidaId=saidaId;
 
     renderFornecedorConteudo(); renderSaidas(); renderMovimentacoes(); atualizarDashboard();
+    if(document.getElementById('listaContasPagar')) renderFinanceiro(window.filtroAtual||'todos');
     const ok = await salvarAgora();
     if(!ok){
       alert('ATENÇÃO: esse pagamento NÃO foi salvo no servidor (falha de conexão). Verifique sua internet e tente novamente.\n\nMotivo técnico: '+window._ultimoErroSalvamento);
@@ -3802,6 +4198,24 @@ function cpLimparFiltroData(){
   window.mesSelecionadoFinanceiro=mesAtualISO();
   cpFecharCalendario();
   renderFinanceiro();
+}
+function _linhaFornecedorResumoHtml(l){
+  const st = _statusLancamento(l);
+  const classe = st==='Vencido'?'status-vencido' : st==='Quitado'?'status-pago' : st==='Vence hoje'?'status-vencehoje' : 'status-avencer';
+  const badgeCor = st==='Quitado'?'green' : st==='Vencido'?'red' : st==='Vence hoje'?'orange' : '';
+  const desc = 'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):'');
+  return `<tr class="${classe}">
+      <td>${dataBR(l.data)}</td>
+      <td>${escapeHtml(desc)}</td>
+      <td><span class="badge gray">Fornecedor</span></td>
+      <td>${moeda(l.valor)}</td>
+      <td>
+        <span class="badge ${badgeCor}">${st}</span><br>
+        ${!l.pago ? `<button class="green" style="margin-top:5px;padding:6px 8px" onclick="marcarParcelaFornecedorPaga('${l.id}')">Marcar pago</button>` : ''}
+      </td>
+      <td>-</td>
+      <td class="muted">Editar em Fornecedores</td>
+    </tr>`;
 }
 function _linhaContaHtml(c,i){
   const parcela=(c.parcelaAtual||c.totalParcelas)?`${c.parcelaAtual||'-'}${c.totalParcelas?'/'+c.totalParcelas:''}`:'';
@@ -3924,6 +4338,12 @@ function renderFinanceiro(){
       if(busca && !String(c.descricao||'').toLowerCase().includes(busca)) return;
       itensVisiveis.push({data:c.data, tipoLinha:'conta', ref:c, idx:finance.indexOf(c)});
     });
+    dividasFornecedores.filter(l=>_dentroDoPeriodo(l.data)).forEach(l=>{
+      if(!mostrarPagas && l.pago) return;
+      const desc = 'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):'');
+      if(busca && !desc.toLowerCase().includes(busca)) return;
+      itensVisiveis.push({data:l.data, tipoLinha:'fornecedor', ref:l});
+    });
   }
   if(mostrarEntradas){
     entradas.filter(e=>_dentroDoPeriodo(e.data)).forEach(e=>{
@@ -3934,7 +4354,7 @@ function renderFinanceiro(){
   if(mostrarSaidas){
     // saídas geradas por uma conta paga não entram aqui de novo — a própria conta já
     // aparece na lista com status "Pago" quando "Mostrar contas a pagar" está marcado.
-    saidas.filter(s=>s.origem!=='ContaPaga' && _dentroDoPeriodo(s.data)).forEach(s=>{
+    saidas.filter(s=>s.origem!=='ContaPaga' && s.origem!=='DividaFornecedor' && _dentroDoPeriodo(s.data)).forEach(s=>{
       if(busca && !String(s.descricao||'').toLowerCase().includes(busca)) return;
       itensVisiveis.push({data:s.data, tipoLinha:'saida', ref:s});
     });
@@ -3944,6 +4364,7 @@ function renderFinanceiro(){
   const linhaDoItem = (it)=>{
     if(it.tipoLinha==='entrada') return _linhaEntradaResumoHtml(it.ref);
     if(it.tipoLinha==='saida') return _linhaSaidaResumoHtml(it.ref);
+    if(it.tipoLinha==='fornecedor') return _linhaFornecedorResumoHtml(it.ref);
     return _linhaContaHtml(it.ref, it.idx);
   };
 
@@ -4100,6 +4521,7 @@ function salvarMovimentacao(){
 
 function abrirNovaConta(){
   document.getElementById('mcTitulo').innerText='Nova conta';
+  mcCategoria.innerHTML=optionsCategorias(''); mcCentroCusto.innerHTML=optionsCentrosCusto('');
   mcIndex.value=''; mcDescricao.value=''; mcCategoria.value=''; mcFornecedor.value=''; mcCentroCusto.value='';
   mcValor.value=''; mcData.value=dataHojeISO(); mcFormaPagamento.value='Dinheiro'; mcTipo.value='Mensal';
   mcParcela.value=''; mcObs.value='';
@@ -4108,6 +4530,7 @@ function abrirNovaConta(){
 function editarConta(i){
   const c=finance[i]; if(!c)return;
   document.getElementById('mcTitulo').innerText='Editar conta';
+  mcCategoria.innerHTML=optionsCategorias(c.categoria||''); mcCentroCusto.innerHTML=optionsCentrosCusto(c.centroCusto||'');
   mcIndex.value=i; mcDescricao.value=c.descricao||''; mcCategoria.value=c.categoria||''; mcFornecedor.value=c.fornecedor||'';
   mcCentroCusto.value=c.centroCusto||''; mcValor.value=c.valor||''; mcData.value=c.data||''; mcFormaPagamento.value=c.formaPagamento||'Dinheiro';
   mcTipo.value=c.tipo||'Mensal'; mcParcela.value=(c.parcelaAtual||c.totalParcelas)?`${c.parcelaAtual||''}${c.totalParcelas?'/'+c.totalParcelas:''}`:'';
