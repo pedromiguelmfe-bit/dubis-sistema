@@ -2912,17 +2912,25 @@ function renderFluxoCaixa(){
   const eventos=[]; // {data, entrada, saida, realizado}
 
   const qtdHistorico=Number(document.getElementById('fluxoHistorico')?.value||0);
-  if(qtdHistorico>0){
-    // Realizado: tudo que já entrou e saiu de verdade, antes de hoje
-    entradas.forEach(e=>{
-      if(!e.data || e.data>=hoje) return;
-      eventos.push({data:e.data, entrada:Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0), saida:0, realizado:true});
-    });
-    saidas.forEach(s=>{
-      if(!s.data || s.data>=hoje) return;
-      eventos.push({data:s.data, entrada:0, saida:Number(s.valor||0), realizado:true});
-    });
-  }
+  // Início do período em que estamos agora (ex: segunda-feira desta semana, ou dia 1 deste mês).
+  // Tudo que já foi recebido/pago DENTRO do período corrente precisa entrar na conta, senão
+  // o total da semana/mês atual fica errado (mostraria só o que ainda falta acontecer).
+  const inicioPeriodoAtual = (agrupar==='dia') ? hoje
+    : (agrupar==='mes') ? hoje.slice(0,7)+'-01'
+    : _chaveFluxo(hoje,'semana');
+
+  entradas.forEach(e=>{
+    if(!e.data || e.data>=hoje) return;
+    const dentroPeriodoAtual = e.data>=inicioPeriodoAtual;
+    if(!dentroPeriodoAtual && qtdHistorico<=0) return; // histórico desligado: só o período corrente
+    eventos.push({data:e.data, entrada:Number(e.valorLiquido!=null?e.valorLiquido:e.valor||0), saida:0, realizado:true});
+  });
+  saidas.forEach(s=>{
+    if(!s.data || s.data>=hoje) return;
+    const dentroPeriodoAtual = s.data>=inicioPeriodoAtual;
+    if(!dentroPeriodoAtual && qtdHistorico<=0) return;
+    eventos.push({data:s.data, entrada:0, saida:Number(s.valor||0), realizado:true});
+  });
 
   // Saídas previstas: contas a pagar em aberto
   finance.forEach(c=>{
@@ -2988,6 +2996,7 @@ function renderFluxoCaixa(){
   cont.innerHTML = chaves.map(k=>{
     const g=grupos[k];
     const passado = k<chaveHojeRef;
+    const atual = k===chaveHojeRef;
     const resultado=g.entrada-g.saida;
     acumulado+=resultado;
     // O alerta de caixa negativo só olha pro futuro — o passado já aconteceu.
@@ -2996,8 +3005,10 @@ function renderFluxoCaixa(){
       if(acumulado<0 && !primeiroNegativo) primeiroNegativo=k;
     }
     const corAcum=acumulado<0?'#991b1b':'#166534';
-    const selo = passado ? '<span class="badge gray" style="font-size:10px">Realizado</span>' : '<span class="badge blue" style="font-size:10px">Previsto</span>';
-    return `<tr style="${passado?'background:#fafafa':''}">
+    const selo = passado ? '<span class="badge gray" style="font-size:10px">Realizado</span>'
+      : atual ? '<span class="badge orange" style="font-size:10px">Em andamento</span>'
+      : '<span class="badge blue" style="font-size:10px">Previsto</span>';
+    return `<tr style="${passado?'background:#fafafa':atual?'background:#fffbeb':''}">
       <td><strong>${_rotuloFluxo(k,agrupar)}</strong><br>${selo}</td>
       <td style="color:#166534">${g.entrada>0?moeda(g.entrada):'-'}</td>
       <td style="color:#991b1b">${g.saida>0?moeda(g.saida):'-'}</td>
