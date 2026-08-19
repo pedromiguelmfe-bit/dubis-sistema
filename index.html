@@ -600,7 +600,16 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       </div>
 
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:6px 0 10px">
-        <input id="cpBusca" class="inline-input" style="max-width:340px" placeholder="Buscar por descrição..." oninput="renderFinanceiro()">
+        <input id="cpBusca" class="inline-input" style="max-width:340px" placeholder="Buscar por descrição ou fornecedor..." oninput="renderFinanceiro()">
+        <select id="cpFiltroCategoria" class="inline-input" style="max-width:180px" onchange="renderFinanceiro()"><option value="">Todas categorias</option></select>
+        <select id="cpFiltroStatus" class="inline-input" style="max-width:170px" onchange="renderFinanceiro()">
+          <option value="">Todos status</option>
+          <option value="A vencer">A vencer</option>
+          <option value="Vence hoje">Vence hoje</option>
+          <option value="Vencido">Vencido</option>
+          <option value="Pago">Pago</option>
+          <option value="Cancelada">Cancelada</option>
+        </select>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;font-weight:700"><input type="checkbox" id="cpMostrarContas" checked style="width:auto" onchange="renderFinanceiro()"> Mostrar contas a pagar</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;font-weight:700"><input type="checkbox" id="cpMostrarPagas" style="width:auto" onchange="renderFinanceiro()"> Mostrar contas pagas</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;font-weight:700"><input type="checkbox" id="cpMostrarSaidas" style="width:auto" onchange="renderFinanceiro()"> Mostrar saídas</label>
@@ -642,10 +651,15 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <div class="grid2">
         <div style="grid-column:1/-1"><label>Descrição</label><input id="mcDescricao" placeholder="Ex: Aluguel, Fornecedor de peças..."></div>
         <div><label>Categoria</label><select id="mcCategoria"></select></div>
+        <div><label>Subcategoria (opcional)</label><input id="mcSubcategoria" placeholder="Ex: Energia, Combustível..."></div>
         <div><label>Fornecedor</label><input id="mcFornecedor" placeholder="Nome do fornecedor"></div>
         <div><label>Centro de custo</label><select id="mcCentroCusto"></select></div>
         <div><label>Valor (R$)</label><input id="mcValor" type="number" step="0.01" placeholder="Deixe em branco se ainda não sabe"></div>
         <div><label>Data de vencimento</label><input id="mcData" type="date"></div>
+        <div><label>Data de emissão (opcional)</label><input id="mcEmissao" type="date"></div>
+        <div><label>Competência (opcional)</label><input id="mcCompetencia" type="month"></div>
+        <div><label>Nº do documento (opcional)</label><input id="mcDocumento" placeholder="Ex: NF 12345, boleto..."></div>
+        <div><label>Conta / caixa prevista</label><input id="mcContaBancaria" placeholder="Ex: Caixa, Banco X"></div>
         <div><label>Forma de pagamento prevista</label><select id="mcFormaPagamento"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
         <div><label>Tipo</label><select id="mcTipo"><option>Mensal</option><option>Variável</option><option>Semanal</option></select></div>
         <div><label>Parcela atual / total</label><input id="mcParcela" placeholder="Ex: 3/12"></div>
@@ -1372,6 +1386,7 @@ function limparOrcamentosAntigos(){
 }
 
 function statusAutomaticoConta(c){
+  if(c.status === 'Cancelada') return 'Cancelada';
   if(c.status === 'Pago') return 'Pago';
   if(c.status === 'Parcialmente pago') return 'Parcialmente pago';
   const semValor = (c.valor===null || c.valor===undefined || c.valor==='' || Number(c.valor)===0);
@@ -1479,7 +1494,7 @@ function atualizarDashboard(){
 
   const fornPendentes = dividasFornecedores.filter(l=>!l.pago);
 
-  const contasHoje = finance.filter(f=>f.status!=='Pago' && String(f.data||'').slice(0,10)===hoje);
+  const contasHoje = finance.filter(f=>f.status!=='Pago' && f.status!=='Cancelada' && String(f.data||'').slice(0,10)===hoje);
   const fornHoje = fornPendentes.filter(l=>String(l.data||'').slice(0,10)===hoje);
   const pagarHoje = contasHoje.reduce((s,f)=>s+Number(f.valor||0),0) + fornHoje.reduce((s,l)=>s+Number(l.valor||0),0);
   const vencidas  = finance.filter(f=>f.status==='Vencido').reduce((s,f)=>s+Number(f.valor||0),0)
@@ -2572,7 +2587,7 @@ function renderPainelGeral(){
   const saldoAtual = totalEntradasHist - totalSaidasHist;
 
   // Contas a pagar no mês (pendentes) = finance pendente + fornecedores pendentes, dentro do mês
-  const contasPendentesMes = finance.filter(f=>f.status!=='Pago' && String(f.data||'').slice(0,7)===mesRef);
+  const contasPendentesMes = finance.filter(f=>f.status!=='Pago' && f.status!=='Cancelada' && String(f.data||'').slice(0,7)===mesRef);
   const fornPendentesMes = dividasFornecedores.filter(l=>!l.pago && String(l.data||'').slice(0,7)===mesRef);
   const pagarMes = contasPendentesMes.reduce((s,f)=>s+Number(f.valor||0),0) + fornPendentesMes.reduce((s,l)=>s+Number(l.valor||0),0);
 
@@ -2614,11 +2629,11 @@ function renderPainelGeral(){
   setTxt('pgVencidasValor', moeda(vencidasValor));
   setTxt('pgVencidasQtd', vencidasQtd+' conta'+(vencidasQtd!==1?'s':''));
 
-  const pagarHojeVal = finance.filter(f=>f.status!=='Pago' && String(f.data||'').slice(0,10)===hoje).reduce((s,f)=>s+Number(f.valor||0),0)
+  const pagarHojeVal = finance.filter(f=>f.status!=='Pago' && f.status!=='Cancelada' && String(f.data||'').slice(0,10)===hoje).reduce((s,f)=>s+Number(f.valor||0),0)
     + dividasFornecedores.filter(l=>!l.pago && String(l.data||'').slice(0,10)===hoje).reduce((s,l)=>s+Number(l.valor||0),0);
   setTxt('pgPagarHoje', moeda(pagarHojeVal));
 
-  const em7 = finance.filter(f=>f.status!=='Pago').filter(f=>{const d=_diasAteVencimento(f.data); return d>=0&&d<=7;}).reduce((s,f)=>s+Number(f.valor||0),0)
+  const em7 = finance.filter(f=>f.status!=='Pago'&&f.status!=='Cancelada').filter(f=>{const d=_diasAteVencimento(f.data); return d>=0&&d<=7;}).reduce((s,f)=>s+Number(f.valor||0),0)
     + dividasFornecedores.filter(l=>!l.pago).filter(l=>{const d=_diasAteVencimento(l.data); return d>=0&&d<=7;}).reduce((s,l)=>s+Number(l.valor||0),0);
   setTxt('pgPagar7dias', moeda(em7));
 
@@ -2655,7 +2670,7 @@ function renderPainelGeral(){
 
   // ---- Próximos vencimentos ----
   const proxVenc = [
-    ...finance.filter(f=>f.status!=='Pago').map(f=>({data:f.data, desc:f.descricao, valor:f.valor})),
+    ...finance.filter(f=>f.status!=='Pago'&&f.status!=='Cancelada').map(f=>({data:f.data, desc:f.descricao, valor:f.valor})),
     ...dividasFornecedores.filter(l=>!l.pago).map(l=>({data:l.data, desc:'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):''), valor:l.valor}))
   ].filter(x=>x.data).sort((a,b)=>String(a.data).localeCompare(String(b.data))).slice(0,6);
   document.getElementById('pgProximosVencimentos').innerHTML = proxVenc.length ? '<table class="rec-table"><tbody>'+
@@ -4232,7 +4247,7 @@ function _linhaContaHtml(c,i){
         ${(statusTexto==='Pago'||statusTexto==='Parcialmente pago') ? `<button class="gray" style="margin-top:5px;padding:6px 8px" onclick="desfazerPagamento(${i})">Desfazer pagamento</button>` : `<button class="green" style="margin-top:5px;padding:6px 8px" onclick="marcarContaPaga(${i})">Marcar pago</button>`}
       </td>
       <td><input class="inline-input" value="${parcela}" onchange="alterarParcelaConta(${i},this.value)"></td>
-      <td style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="editarConta(${i})">Editar</button><button class="red" onclick="excluirConta(${i})">Excluir</button></td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="editarConta(${i})">Editar</button><button class="gray" onclick="duplicarConta(${i})">Duplicar</button>${c.status==='Cancelada'?`<button class="gray" onclick="reativarConta(${i})">Reativar</button>`:`<button class="gray" onclick="cancelarConta(${i})">Cancelar</button>`}<button class="red" onclick="excluirConta(${i})">Excluir</button></td>
     </tr>`;
 }
 function _linhaEntradaResumoHtml(e){
@@ -4264,6 +4279,14 @@ function renderFinanceiro(){
   renderBarraMeses();
 
   const busca=(document.getElementById('cpBusca')?.value||'').trim().toLowerCase();
+  const filtroCategoria=(document.getElementById('cpFiltroCategoria')?.value||'');
+  const filtroStatus=(document.getElementById('cpFiltroStatus')?.value||'');
+  const selCat=document.getElementById('cpFiltroCategoria');
+  if(selCat && typeof categoriasAtivas==='function'){
+    const atual=selCat.value;
+    selCat.innerHTML='<option value="">Todas categorias</option>'+categoriasAtivas().map(c=>`<option value="${escapeHtml(c.nome)}">${escapeHtml(c.nome)}</option>`).join('');
+    selCat.value=atual;
+  }
   const mostrarContas=document.getElementById('cpMostrarContas')?.checked??true;
   const mostrarPagas=document.getElementById('cpMostrarPagas')?.checked||false;
   const mostrarSaidas=document.getElementById('cpMostrarSaidas')?.checked||false;
@@ -4335,13 +4358,16 @@ function renderFinanceiro(){
   if(mostrarContas){
     periodoContas.forEach(c=>{
       if(!mostrarPagas && c.status==='Pago') return;
-      if(busca && !String(c.descricao||'').toLowerCase().includes(busca)) return;
+      if(busca && !(String(c.descricao||'').toLowerCase().includes(busca) || String(c.fornecedor||'').toLowerCase().includes(busca))) return;
+      if(filtroCategoria && (c.categoria||'')!==filtroCategoria) return;
+      if(filtroStatus && statusAutomaticoConta(c)!==filtroStatus) return;
       itensVisiveis.push({data:c.data, tipoLinha:'conta', ref:c, idx:finance.indexOf(c)});
     });
     dividasFornecedores.filter(l=>_dentroDoPeriodo(l.data)).forEach(l=>{
       if(!mostrarPagas && l.pago) return;
+      if(filtroCategoria) return; // lançamentos de fornecedor não têm categoria; sai quando filtra categoria
       const desc = 'Fornecedor: '+l.fornecedor+(l.descricao?(' - '+l.descricao):'');
-      if(busca && !desc.toLowerCase().includes(busca)) return;
+      if(busca && !(desc.toLowerCase().includes(busca) || String(l.fornecedor||'').toLowerCase().includes(busca))) return;
       itensVisiveis.push({data:l.data, tipoLinha:'fornecedor', ref:l});
     });
   }
@@ -4522,8 +4548,9 @@ function salvarMovimentacao(){
 function abrirNovaConta(){
   document.getElementById('mcTitulo').innerText='Nova conta';
   mcCategoria.innerHTML=optionsCategorias(''); mcCentroCusto.innerHTML=optionsCentrosCusto('');
-  mcIndex.value=''; mcDescricao.value=''; mcCategoria.value=''; mcFornecedor.value=''; mcCentroCusto.value='';
-  mcValor.value=''; mcData.value=dataHojeISO(); mcFormaPagamento.value='Dinheiro'; mcTipo.value='Mensal';
+  mcIndex.value=''; mcDescricao.value=''; mcCategoria.value=''; mcSubcategoria.value=''; mcFornecedor.value=''; mcCentroCusto.value='';
+  mcValor.value=''; mcData.value=dataHojeISO(); mcEmissao.value=''; mcCompetencia.value=''; mcDocumento.value=''; mcContaBancaria.value='';
+  mcFormaPagamento.value='Dinheiro'; mcTipo.value='Mensal';
   mcParcela.value=''; mcObs.value='';
   modalContaOverlay.classList.add('aberto');
 }
@@ -4531,8 +4558,9 @@ function editarConta(i){
   const c=finance[i]; if(!c)return;
   document.getElementById('mcTitulo').innerText='Editar conta';
   mcCategoria.innerHTML=optionsCategorias(c.categoria||''); mcCentroCusto.innerHTML=optionsCentrosCusto(c.centroCusto||'');
-  mcIndex.value=i; mcDescricao.value=c.descricao||''; mcCategoria.value=c.categoria||''; mcFornecedor.value=c.fornecedor||'';
-  mcCentroCusto.value=c.centroCusto||''; mcValor.value=c.valor||''; mcData.value=c.data||''; mcFormaPagamento.value=c.formaPagamento||'Dinheiro';
+  mcIndex.value=i; mcDescricao.value=c.descricao||''; mcCategoria.value=c.categoria||''; mcSubcategoria.value=c.subcategoria||''; mcFornecedor.value=c.fornecedor||'';
+  mcCentroCusto.value=c.centroCusto||''; mcValor.value=c.valor||''; mcData.value=c.data||''; mcEmissao.value=c.emissao||''; mcCompetencia.value=c.competencia||''; mcDocumento.value=c.documento||''; mcContaBancaria.value=c.contaBancaria||'';
+  mcFormaPagamento.value=c.formaPagamento||'Dinheiro';
   mcTipo.value=c.tipo||'Mensal'; mcParcela.value=(c.parcelaAtual||c.totalParcelas)?`${c.parcelaAtual||''}${c.totalParcelas?'/'+c.totalParcelas:''}`:'';
   mcObs.value=c.obs||'';
   modalContaOverlay.classList.add('aberto');
@@ -4543,9 +4571,10 @@ function salvarContaForm(){
   if(!mcData.value){alert('Informe a data de vencimento.');return}
   const partes=(mcParcela.value||'').split('/');
   const dados={
-    descricao:mcDescricao.value.trim(), categoria:mcCategoria.value.trim(), fornecedor:mcFornecedor.value.trim(),
+    descricao:mcDescricao.value.trim(), categoria:mcCategoria.value.trim(), subcategoria:mcSubcategoria.value.trim(), fornecedor:mcFornecedor.value.trim(),
     centroCusto:mcCentroCusto.value.trim(), valor:mcValor.value===''?0:Number(mcValor.value),
-    data:mcData.value, formaPagamento:mcFormaPagamento.value, tipo:mcTipo.value,
+    data:mcData.value, emissao:mcEmissao.value, competencia:mcCompetencia.value, documento:mcDocumento.value.trim(), contaBancaria:mcContaBancaria.value.trim(),
+    formaPagamento:mcFormaPagamento.value, tipo:mcTipo.value,
     parcelaAtual:partes[0]?partes[0].trim():'', totalParcelas:partes[1]?partes[1].trim():'',
     obs:mcObs.value.trim()
   };
@@ -4562,10 +4591,37 @@ function salvarContaForm(){
   if(typeof renderFornecedores==='function') renderFornecedores();
   salvarAgora();
 }
+async function duplicarConta(i){
+  const c=finance[i]; if(!c)return;
+  const copia = JSON.parse(JSON.stringify(c));
+  copia.id = Date.now()+Math.floor(Math.random()*100000);
+  copia.status = ''; // a cópia nasce pendente
+  delete copia.pagamentos; copia.dataPagamento=null; copia.valorPago=null;
+  copia.descricao = (c.descricao||'')+' (cópia)';
+  finance.splice(i+1,0,copia);
+  renderFinanceiro(window.filtroAtual||'todos'); atualizarDashboard();
+  const ok=await salvarAgora();
+  if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+}
+async function cancelarConta(i){
+  const c=finance[i]; if(!c)return;
+  if(c.status==='Pago'||c.status==='Parcialmente pago'){ alert('Esta conta já tem pagamento lançado. Desfaça o pagamento antes de cancelar.'); return; }
+  if(!confirm('Cancelar esta conta? Ela deixa de contar nos totais e alertas, mas continua no histórico (dá pra reativar depois).'))return;
+  c.status='Cancelada';
+  renderFinanceiro(window.filtroAtual||'todos'); atualizarDashboard();
+  const ok=await salvarAgora();
+  if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+}
+async function reativarConta(i){
+  const c=finance[i]; if(!c)return;
+  c.status='';
+  renderFinanceiro(window.filtroAtual||'todos'); atualizarDashboard();
+  const ok=await salvarAgora();
+  if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+}
 function marcarContaPaga(i){
   const c=finance[i]; if(!c)return;
-  if(!confirm('Tem certeza de que esta conta foi paga?'))return;
-  mpIndex.value=i; mpDescricaoConta.innerText='Conta: '+(c.descricao||'')+' — '+moeda(c.valor||0);
+  if(!confirm('Tem certeza de que esta conta foi paga?'))return;  mpIndex.value=i; mpDescricaoConta.innerText='Conta: '+(c.descricao||'')+' — '+moeda(c.valor||0);
   mpData.value=dataHojeISO(); mpValor.value=c.valor||''; mpForma.value=c.formaPagamento||'Dinheiro'; mpConta.value=''; mpObs.value='';
   modalPagamentoOverlay.classList.add('aberto');
 }
