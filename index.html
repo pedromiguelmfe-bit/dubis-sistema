@@ -740,7 +740,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <div class="cp-topo">
         <div>
           <h3>Contas a Receber</h3>
-          <p class="muted">O que a oficina tem pra receber (além dos fiados, que ficam na aba própria). Ex: serviços faturados, acordos com clientes, reembolsos.</p>
+          <p class="muted">Tudo que a oficina tem pra receber num lugar só: os fiados (OS que o cliente vai pagar depois, com as parcelas/datas que você cadastra em "Parcelas / datas") e contas a receber avulsas que você lançar aqui.</p>
         </div>
         <button class="btn-nova" onclick="abrirNovaContaReceber()">+ Nova Conta a Receber</button>
       </div>
@@ -1528,6 +1528,10 @@ function renderTudo(){
   limparOrcamentosAntigos();
   renderQuotes(); renderOS(); renderFinanceiro('todos'); renderEntradas();
   renderSaidas(); renderClientes(); renderFuncionarios(); renderConcluidos(); renderFiados(); renderMovimentacoes(); renderCalendarioFinanceiro(); renderRelatorios(); renderEstoque();
+  if(typeof renderContasReceber==='function') renderContasReceber();
+  if(typeof renderCategorias==='function') renderCategorias();
+  if(typeof renderFornecedores==='function') renderFornecedores();
+  if(typeof renderPainelGeral==='function') renderPainelGeral();
   atualizarDashboard();
 }
 function abrir(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');titulo.innerText={dashboard:'Dashboard',orcamentos:'Orçamentos',os:'Ordens de Serviço',concluidos:'Serviços Concluídos',fiados:'Fiados e Acordos',financeiro:'Financeiro',estoque:'Estoque',fornecedores:'Fornecedores',funcionarios:'Funcionários',clientes:'Clientes'}[id]}
@@ -2391,7 +2395,7 @@ function abrirDetalhesFiado(quoteId){
   renderCobrancasConteudo();
   modalCobrancasOverlay.classList.add('aberto');
 }
-function fecharModalCobrancas(){ modalCobrancasOverlay.classList.remove('aberto'); renderFiados(); }
+function fecharModalCobrancas(){ modalCobrancasOverlay.classList.remove('aberto'); renderFiados(); if(typeof renderContasReceber==='function') renderContasReceber(); }
 function renderCobrancasConteudo(){
   const quoteId=window.__detalhesFiadoQuoteId;
   const achado=_buscarRegistroPorQuoteId(quoteId);
@@ -2654,41 +2658,86 @@ function renderContasReceber(){
   const mesRef = mesAtualISO();
   const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
 
-  const pendentes = contasReceber.filter(cr=>cr.status!=='Recebido' && cr.status!=='Cancelado');
-  setTxt('crTotalReceber', moeda(pendentes.reduce((s,cr)=>s+Number(cr.valor||0),0)));
-  setTxt('crRecebidoMes', moeda(contasReceber.filter(cr=>cr.status==='Recebido' && String(cr.dataRecebimento||'').slice(0,7)===mesRef).reduce((s,cr)=>s+Number(cr.valorRecebido||cr.valor||0),0)));
-  setTxt('crAtrasado', moeda(pendentes.filter(cr=>_diasAteVencimento(cr.previsao)<0).reduce((s,cr)=>s+Number(cr.valor||0),0)));
+  // --- Fiados (OS enviadas pra Fiados e Acordos, com saldo em aberto) ---
+  const fiados = _listaFiados();
+  const saldoFiado = o => Math.max(0, Number(o.total||0)-_totalPagoOS(o));
+  const totalFiados = fiados.reduce((s,o)=>s+saldoFiado(o),0);
+  const fiadosAtrasados = fiados.filter(o=>_statusAcordo(o)==='Vencido').reduce((s,o)=>s+saldoFiado(o),0);
 
-  // popular filtro de categoria do modal (usa mesmas categorias)
-  const selCat=document.getElementById('crCategoria');
-  if(selCat && typeof optionsCategorias==='function' && !selCat.dataset.pop){ /* populado on-open */ }
+  // --- Contas a receber avulsas ---
+  const crPendentes = contasReceber.filter(cr=>cr.status!=='Recebido' && cr.status!=='Cancelado');
+  const totalCR = crPendentes.reduce((s,cr)=>s+Number(cr.valor||0),0);
+  const crAtrasado = crPendentes.filter(cr=>_diasAteVencimento(cr.previsao)<0).reduce((s,cr)=>s+Number(cr.valor||0),0);
+
+  const recebidoMesCR = contasReceber.filter(cr=>cr.status==='Recebido' && String(cr.dataRecebimento||'').slice(0,7)===mesRef).reduce((s,cr)=>s+Number(cr.valorRecebido||cr.valor||0),0);
+  // recebido de fiados no mês = entradas com origem Ordem de Serviço no mês
+  const recebidoMesFiado = entradas.filter(e=>e.origem==='Ordem de Serviço' && String(e.data||'').slice(0,7)===mesRef).reduce((s,e)=>s+Number(e.valor||0),0);
+
+  setTxt('crTotalReceber', moeda(totalFiados + totalCR));
+  setTxt('crRecebidoMes', moeda(recebidoMesCR + recebidoMesFiado));
+  setTxt('crAtrasado', moeda(fiadosAtrasados + crAtrasado));
 
   const busca=normalizarTextoBusca(document.getElementById('crBusca')?.value||'');
   const filtroStatus=document.getElementById('crFiltroStatus')?.value||'';
-  let lista=[...contasReceber];
-  if(busca) lista=lista.filter(cr=>normalizarTextoBusca(cr.cliente).includes(busca)||normalizarTextoBusca(cr.descricao).includes(busca));
-  if(filtroStatus) lista=lista.filter(cr=>_statusContaReceber(cr)===filtroStatus);
-  lista.sort((a,b)=>String(a.previsao||'9999').localeCompare(String(b.previsao||'9999')));
 
-  if(lista.length===0){
-    cont.innerHTML = '<tr><td colspan="6" class="muted">'+(contasReceber.length===0?'Nenhuma conta a receber cadastrada.':'Nenhuma conta encontrada para esse filtro.')+'</td></tr>';
+  // Monta linhas unificadas: fiados + avulsas
+  let linhas=[];
+
+  fiados.forEach(o=>{
+    const prox=_proximaParcelaPendente(o);
+    const stAcordo=_statusAcordo(o);
+    const st = stAcordo==='Vencido' ? 'Atrasado' : 'Pendente';
+    const previsao = prox ? prox.data : (o.proximoVencimento||'');
+    linhas.push({
+      tipo:'fiado', quoteId:o.quoteId, previsao,
+      cliente:o.cliente, descricao:'Fiado · OS #'+o.quoteId+(o.veiculo?(' · '+o.veiculo):''),
+      categoria:'Fiado', valor:saldoFiado(o), st,
+      cor: st==='Atrasado'?'red':'orange'
+    });
+  });
+  contasReceber.forEach(cr=>{
+    const st=_statusContaReceber(cr);
+    linhas.push({
+      tipo:'avulsa', id:cr.id, previsao:cr.previsao,
+      cliente:cr.cliente, descricao:cr.descricao||'', categoria:cr.categoria||'-',
+      valor:cr.valor, st, cor: st==='Recebido'?'green':st==='Atrasado'?'red':st==='Cancelado'?'gray':'orange'
+    });
+  });
+
+  if(busca) linhas=linhas.filter(l=>normalizarTextoBusca(l.cliente).includes(busca)||normalizarTextoBusca(l.descricao).includes(busca));
+  if(filtroStatus) linhas=linhas.filter(l=>l.st===filtroStatus);
+  linhas.sort((a,b)=>String(a.previsao||'9999').localeCompare(String(b.previsao||'9999')));
+
+  if(linhas.length===0){
+    cont.innerHTML = '<tr><td colspan="6" class="muted">Nada a receber no momento. 🎉</td></tr>';
     return;
   }
-  cont.innerHTML = lista.map(cr=>{
-    const st=_statusContaReceber(cr);
-    const cor = st==='Recebido'?'green':st==='Atrasado'?'red':st==='Cancelado'?'gray':'orange';
+  cont.innerHTML = linhas.map(l=>{
+    if(l.tipo==='fiado'){
+      return `<tr>
+        <td>${l.previsao?dataBR(l.previsao):'<span class="muted">a combinar</span>'}</td>
+        <td><strong>${escapeHtml(l.cliente||'-')}</strong><br><small class="muted">${escapeHtml(l.descricao)}</small></td>
+        <td><span class="badge blue">Fiado</span></td>
+        <td>${moeda(l.valor)}</td>
+        <td><span class="badge ${l.cor}">${l.st}</span></td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="green" onclick="abrirLancarPagamentoPorQuoteId('${l.quoteId}')">Receber</button>
+          <button onclick="abrirDetalhesFiado('${l.quoteId}')">Parcelas / datas</button>
+        </td>
+      </tr>`;
+    }
     return `<tr>
-      <td>${dataBR(cr.previsao)}</td>
-      <td><strong>${escapeHtml(cr.cliente||'-')}</strong>${cr.descricao?'<br><small class="muted">'+escapeHtml(cr.descricao)+'</small>':''}</td>
-      <td>${escapeHtml(cr.categoria||'-')}</td>
-      <td>${moeda(cr.valor)}</td>
-      <td><span class="badge ${cor}">${st}</span></td>
+      <td>${dataBR(l.previsao)}</td>
+      <td><strong>${escapeHtml(l.cliente||'-')}</strong>${l.descricao?'<br><small class="muted">'+escapeHtml(l.descricao)+'</small>':''}</td>
+      <td>${escapeHtml(l.categoria||'-')}</td>
+      <td>${moeda(l.valor)}</td>
+      <td><span class="badge ${l.cor}">${l.st}</span></td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
-        ${(st!=='Recebido'&&st!=='Cancelado')?`<button class="green" onclick="abrirModalReceber('${cr.id}')">Receber</button>`:''}
-        ${st==='Recebido'?`<button class="gray" onclick="desfazerRecebimento('${cr.id}')">Desfazer</button>`:''}
-        <button onclick="editarContaReceber('${cr.id}')">Editar</button>
-        ${st==='Cancelado'?`<button class="gray" onclick="reativarContaReceber('${cr.id}')">Reativar</button>`:`<button class="gray" onclick="cancelarContaReceber('${cr.id}')">Cancelar</button>`}
-        <button class="red" onclick="excluirContaReceber('${cr.id}')">Excluir</button>
+        ${(l.st!=='Recebido'&&l.st!=='Cancelado')?`<button class="green" onclick="abrirModalReceber('${l.id}')">Receber</button>`:''}
+        ${l.st==='Recebido'?`<button class="gray" onclick="desfazerRecebimento('${l.id}')">Desfazer</button>`:''}
+        <button onclick="editarContaReceber('${l.id}')">Editar</button>
+        ${l.st==='Cancelado'?`<button class="gray" onclick="reativarContaReceber('${l.id}')">Reativar</button>`:`<button class="gray" onclick="cancelarContaReceber('${l.id}')">Cancelar</button>`}
+        <button class="red" onclick="excluirContaReceber('${l.id}')">Excluir</button>
       </td>
     </tr>`;
   }).join('');
@@ -5456,3 +5505,4 @@ function atualizarResumoFinanceiro(filtro='todos'){
 </script>
 </body>
 </html>
+      
