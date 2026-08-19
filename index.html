@@ -428,6 +428,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       <button class="activeTab" onclick="abrirFinanceiro('finPainel', this)">Painel Geral</button>
       <button onclick="abrirFinanceiro('finResumo', this)">Resumo</button>
       <button onclick="abrirFinanceiro('finPagamentos', this)">Pagamentos</button>
+      <button onclick="abrirFinanceiro('finReceber', this)">Contas a Receber</button>
       <button onclick="abrirFinanceiro('finEntradas', this)">Entradas</button>
       <button onclick="abrirFinanceiro('finSaidas', this)">Saídas</button>
       <button onclick="abrirFinanceiro('finMovimentacoes', this)">Movimentações e Resultados</button>
@@ -730,6 +731,79 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
         <button class="gray" onclick="fecharModalPrepararMes()">Cancelar</button>
         <button class="gray" onclick="ppmConfirmarTodas()">Confirmar todas</button>
         <button class="dark" onclick="ppmGerarSelecionadas()">Gerar contas selecionadas</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="finReceber" class="finance-subsection">
+    <div class="panel">
+      <div class="cp-topo">
+        <div>
+          <h3>Contas a Receber</h3>
+          <p class="muted">O que a oficina tem pra receber (além dos fiados, que ficam na aba própria). Ex: serviços faturados, acordos com clientes, reembolsos.</p>
+        </div>
+        <button class="btn-nova" onclick="abrirNovaContaReceber()">+ Nova Conta a Receber</button>
+      </div>
+
+      <div class="os-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:14px">
+        <div class="os-card"><small class="muted">Total a receber</small><strong id="crTotalReceber" style="font-size:20px;color:#c2660a">R$ 0,00</strong></div>
+        <div class="os-card"><small class="muted">Recebido no mês</small><strong id="crRecebidoMes" style="font-size:20px;color:#166534">R$ 0,00</strong></div>
+        <div class="os-card"><small class="muted">Atrasado</small><strong id="crAtrasado" style="font-size:20px;color:#991b1b">R$ 0,00</strong></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+        <input id="crBusca" class="inline-input" style="max-width:280px" placeholder="Buscar por cliente ou descrição..." oninput="renderContasReceber()">
+        <select id="crFiltroStatus" class="inline-input" style="max-width:170px" onchange="renderContasReceber()">
+          <option value="">Todos status</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Atrasado">Atrasado</option>
+          <option value="Recebido">Recebido</option>
+          <option value="Cancelado">Cancelado</option>
+        </select>
+      </div>
+
+      <table class="finance-table">
+        <thead><tr><th>Previsão</th><th style="min-width:200px">Cliente / Descrição</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead>
+        <tbody id="listaContasReceber"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalContaReceberOverlay">
+    <div class="cp-modal">
+      <h3 id="crModalTitulo">Nova Conta a Receber</h3>
+      <input type="hidden" id="crId">
+      <div class="grid2">
+        <div><label>Cliente</label><input id="crCliente" placeholder="Nome do cliente"></div>
+        <div><label>Categoria</label><select id="crCategoria"></select></div>
+        <div style="grid-column:1/-1"><label>Descrição</label><input id="crDescricao" placeholder="Ex: Serviço faturado, acordo..."></div>
+        <div><label>Valor (R$)</label><input id="crValor" type="number" step="0.01"></div>
+        <div><label>Previsão de recebimento</label><input id="crPrevisao" type="date"></div>
+        <div><label>Competência (opcional)</label><input id="crCompetencia" type="month"></div>
+        <div><label>Forma de recebimento</label><select id="crForma"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
+        <div style="grid-column:1/-1"><label>Observações</label><input id="crObs" placeholder="Opcional"></div>
+      </div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalContaReceber()">Cancelar</button>
+        <button class="dark" onclick="salvarContaReceber()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cp-modal-overlay" id="modalReceberOverlay">
+    <div class="cp-modal">
+      <h3>Confirmar recebimento</h3>
+      <p class="muted" id="crRecDescricao"></p>
+      <input type="hidden" id="crRecId">
+      <div class="grid2">
+        <div><label>Data do recebimento</label><input id="crRecData" type="date"></div>
+        <div><label>Valor recebido (R$)</label><input id="crRecValor" type="number" step="0.01"></div>
+        <div><label>Forma</label><select id="crRecForma"><option>Dinheiro</option><option>Pix</option><option>Transferência</option><option>Cartão</option><option>Boleto</option></select></div>
+        <div><label>Conta / caixa de destino</label><input id="crRecConta" placeholder="Ex: Caixa, Banco X"></div>
+      </div>
+      <div class="actions">
+        <button class="gray" onclick="fecharModalReceber()">Cancelar</button>
+        <button class="dark" onclick="confirmarRecebimento()">Confirmar recebimento</button>
       </div>
     </div>
   </div>
@@ -1196,6 +1270,7 @@ let entradas=[];
 let dividasFornecedores=[];
 let categoriasFin=[];
 let centrosCusto=[];
+let contasReceber=[];
 const CATEGORIAS_PADRAO = [
   {id:'cat_pessoal', nome:'Pessoal', descricao:'Salários, benefícios, pró-labore', ativo:true},
   {id:'cat_fornecedores', nome:'Fornecedores', descricao:'Peças, materiais, serviços terceirizados', ativo:true},
@@ -1268,6 +1343,7 @@ async function carregarDadosSalvos(){
     if(usar.dividasFornecedores) dividasFornecedores = usar.dividasFornecedores;
     if(usar.categoriasFin) categoriasFin = usar.categoriasFin;
     if(usar.centrosCusto) centrosCusto = usar.centrosCusto;
+    if(usar.contasReceber) contasReceber = usar.contasReceber;
     // Primeira vez que o sistema roda com o módulo de categorias: semeia as categorias
     // padrão da spec pra loja não começar do zero (pode editar/desativar depois).
     if(!categoriasFin || categoriasFin.length===0){ categoriasFin = JSON.parse(JSON.stringify(CATEGORIAS_PADRAO)); }
@@ -1294,7 +1370,7 @@ async function carregarDadosSalvos(){
 
 /* ===== Salvamento com aviso visível + cópia de segurança local ===== */
 function _coletarDados(){
-  return {quotes, serviceOrders, clients, finance, entradas, saidas, funcionarios, servicosConcluidos, recorrentes, estoque, dividasFornecedores, categoriasFin, centrosCusto};
+  return {quotes, serviceOrders, clients, finance, entradas, saidas, funcionarios, servicosConcluidos, recorrentes, estoque, dividasFornecedores, categoriasFin, centrosCusto, contasReceber};
 }
 function _salvarBackupLocal(dados, ts){
   try{ localStorage.setItem('dubis_backup', JSON.stringify({dados, ts})); }catch(e){}
@@ -1485,6 +1561,7 @@ function abrirFinanceiro(id,btn){
   renderRelatorios();
   renderPainelGeral();
   renderCategorias();
+  renderContasReceber();
 }
 
 function atualizarDashboard(){
@@ -2564,6 +2641,152 @@ async function alternarCentroCusto(id){
   if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
 }
 
+/* ===== Contas a Receber ===== */
+function _statusContaReceber(cr){
+  if(cr.status==='Recebido') return 'Recebido';
+  if(cr.status==='Cancelado') return 'Cancelado';
+  if(_diasAteVencimento(cr.previsao)<0) return 'Atrasado';
+  return 'Pendente';
+}
+function renderContasReceber(){
+  const cont=document.getElementById('listaContasReceber');
+  if(!cont)return;
+  const mesRef = mesAtualISO();
+  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
+
+  const pendentes = contasReceber.filter(cr=>cr.status!=='Recebido' && cr.status!=='Cancelado');
+  setTxt('crTotalReceber', moeda(pendentes.reduce((s,cr)=>s+Number(cr.valor||0),0)));
+  setTxt('crRecebidoMes', moeda(contasReceber.filter(cr=>cr.status==='Recebido' && String(cr.dataRecebimento||'').slice(0,7)===mesRef).reduce((s,cr)=>s+Number(cr.valorRecebido||cr.valor||0),0)));
+  setTxt('crAtrasado', moeda(pendentes.filter(cr=>_diasAteVencimento(cr.previsao)<0).reduce((s,cr)=>s+Number(cr.valor||0),0)));
+
+  // popular filtro de categoria do modal (usa mesmas categorias)
+  const selCat=document.getElementById('crCategoria');
+  if(selCat && typeof optionsCategorias==='function' && !selCat.dataset.pop){ /* populado on-open */ }
+
+  const busca=normalizarTextoBusca(document.getElementById('crBusca')?.value||'');
+  const filtroStatus=document.getElementById('crFiltroStatus')?.value||'';
+  let lista=[...contasReceber];
+  if(busca) lista=lista.filter(cr=>normalizarTextoBusca(cr.cliente).includes(busca)||normalizarTextoBusca(cr.descricao).includes(busca));
+  if(filtroStatus) lista=lista.filter(cr=>_statusContaReceber(cr)===filtroStatus);
+  lista.sort((a,b)=>String(a.previsao||'9999').localeCompare(String(b.previsao||'9999')));
+
+  if(lista.length===0){
+    cont.innerHTML = '<tr><td colspan="6" class="muted">'+(contasReceber.length===0?'Nenhuma conta a receber cadastrada.':'Nenhuma conta encontrada para esse filtro.')+'</td></tr>';
+    return;
+  }
+  cont.innerHTML = lista.map(cr=>{
+    const st=_statusContaReceber(cr);
+    const cor = st==='Recebido'?'green':st==='Atrasado'?'red':st==='Cancelado'?'gray':'orange';
+    return `<tr>
+      <td>${dataBR(cr.previsao)}</td>
+      <td><strong>${escapeHtml(cr.cliente||'-')}</strong>${cr.descricao?'<br><small class="muted">'+escapeHtml(cr.descricao)+'</small>':''}</td>
+      <td>${escapeHtml(cr.categoria||'-')}</td>
+      <td>${moeda(cr.valor)}</td>
+      <td><span class="badge ${cor}">${st}</span></td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        ${(st!=='Recebido'&&st!=='Cancelado')?`<button class="green" onclick="abrirModalReceber('${cr.id}')">Receber</button>`:''}
+        ${st==='Recebido'?`<button class="gray" onclick="desfazerRecebimento('${cr.id}')">Desfazer</button>`:''}
+        <button onclick="editarContaReceber('${cr.id}')">Editar</button>
+        ${st==='Cancelado'?`<button class="gray" onclick="reativarContaReceber('${cr.id}')">Reativar</button>`:`<button class="gray" onclick="cancelarContaReceber('${cr.id}')">Cancelar</button>`}
+        <button class="red" onclick="excluirContaReceber('${cr.id}')">Excluir</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function abrirNovaContaReceber(){
+  document.getElementById('crModalTitulo').innerText='Nova Conta a Receber';
+  crCategoria.innerHTML=optionsCategorias('');
+  crId.value=''; crCliente.value=''; crCategoria.value=''; crDescricao.value=''; crValor.value='';
+  crPrevisao.value=dataHojeISO(); crCompetencia.value=''; crForma.value='Pix'; crObs.value='';
+  modalContaReceberOverlay.classList.add('aberto');
+}
+function editarContaReceber(id){
+  const cr=contasReceber.find(x=>x.id===id); if(!cr)return;
+  document.getElementById('crModalTitulo').innerText='Editar Conta a Receber';
+  crCategoria.innerHTML=optionsCategorias(cr.categoria||'');
+  crId.value=cr.id; crCliente.value=cr.cliente||''; crCategoria.value=cr.categoria||''; crDescricao.value=cr.descricao||''; crValor.value=cr.valor||'';
+  crPrevisao.value=cr.previsao||''; crCompetencia.value=cr.competencia||''; crForma.value=cr.forma||'Pix'; crObs.value=cr.obs||'';
+  modalContaReceberOverlay.classList.add('aberto');
+}
+function fecharModalContaReceber(){ modalContaReceberOverlay.classList.remove('aberto'); }
+async function salvarContaReceber(){
+  if(!crCliente.value.trim()){ alert('Informe o cliente.'); return; }
+  if(!crPrevisao.value){ alert('Informe a previsão de recebimento.'); return; }
+  const valor=crValor.value===''?0:Number(crValor.value);
+  if(valor<=0){ alert('Informe o valor.'); return; }
+  const dados={
+    cliente:crCliente.value.trim(), categoria:crCategoria.value.trim(), descricao:crDescricao.value.trim(),
+    valor, previsao:crPrevisao.value, competencia:crCompetencia.value, forma:crForma.value, obs:crObs.value.trim()
+  };
+  try{
+    const id=crId.value;
+    if(id){
+      const cr=contasReceber.find(x=>x.id===id);
+      if(cr) Object.assign(cr,dados);
+    } else {
+      contasReceber.push({id:'cr'+Date.now()+Math.floor(Math.random()*100000), status:'Pendente', dataRecebimento:null, valorRecebido:null, entradaId:null, ...dados});
+    }
+    fecharModalContaReceber(); renderContasReceber(); atualizarDashboard();
+    const ok=await salvarAgora();
+    if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+  }catch(e){ console.error(e); alert('ERRO ao salvar: '+(e&&e.message?e.message:e)); }
+}
+function abrirModalReceber(id){
+  const cr=contasReceber.find(x=>x.id===id); if(!cr)return;
+  crRecId.value=id;
+  document.getElementById('crRecDescricao').innerText = (cr.cliente||'')+' — '+moeda(cr.valor||0);
+  crRecData.value=dataHojeISO(); crRecValor.value=cr.valor||''; crRecForma.value=cr.forma||'Pix'; crRecConta.value='';
+  modalReceberOverlay.classList.add('aberto');
+}
+function fecharModalReceber(){ modalReceberOverlay.classList.remove('aberto'); }
+async function confirmarRecebimento(){
+  const cr=contasReceber.find(x=>x.id===crRecId.value); if(!cr)return;
+  const valorRec=Number(crRecValor.value||0);
+  if(valorRec<=0){ alert('Informe o valor recebido.'); return; }
+  if(!crRecData.value){ alert('Informe a data do recebimento.'); return; }
+  try{
+    const entradaId=Date.now()+Math.floor(Math.random()*100000);
+    entradas.push({id:entradaId, data:crRecData.value, descricao:'Recebimento: '+cr.cliente+(cr.descricao?(' - '+cr.descricao):''), valor:valorRec, forma:(crRecForma.value||'').toUpperCase(), origem:'ContaReceber', contaReceberId:cr.id, contaCaixa:crRecConta.value.trim()});
+    cr.status='Recebido'; cr.dataRecebimento=crRecData.value; cr.valorRecebido=valorRec; cr.entradaId=entradaId; cr.contaDestino=crRecConta.value.trim();
+    fecharModalReceber(); renderContasReceber(); renderEntradas(); atualizarDashboard();
+    const ok=await salvarAgora();
+    if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+  }catch(e){ console.error(e); alert('ERRO ao confirmar recebimento: '+(e&&e.message?e.message:e)); }
+}
+async function desfazerRecebimento(id){
+  const cr=contasReceber.find(x=>x.id===id); if(!cr)return;
+  if(!confirm('Desfazer o recebimento? A entrada correspondente será removida do Financeiro.'))return;
+  try{
+    if(cr.entradaId){ const idx=entradas.findIndex(e=>e.id===cr.entradaId); if(idx>=0) entradas.splice(idx,1); }
+    cr.status='Pendente'; cr.dataRecebimento=null; cr.valorRecebido=null; cr.entradaId=null;
+    renderContasReceber(); renderEntradas(); atualizarDashboard();
+    const ok=await salvarAgora();
+    if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+  }catch(e){ console.error(e); alert('ERRO: '+(e&&e.message?e.message:e)); }
+}
+async function cancelarContaReceber(id){
+  const cr=contasReceber.find(x=>x.id===id); if(!cr)return;
+  if(cr.status==='Recebido'){ alert('Essa conta já foi recebida. Desfaça o recebimento antes de cancelar.'); return; }
+  if(!confirm('Cancelar esta conta a receber? Sai dos totais mas fica no histórico.'))return;
+  cr.status='Cancelado'; renderContasReceber(); atualizarDashboard();
+  const ok=await salvarAgora(); if(!ok) alert('ATENÇÃO: não salvou no servidor.\n\n'+window._ultimoErroSalvamento);
+}
+async function reativarContaReceber(id){
+  const cr=contasReceber.find(x=>x.id===id); if(!cr)return;
+  cr.status='Pendente'; renderContasReceber(); atualizarDashboard();
+  const ok=await salvarAgora(); if(!ok) alert('ATENÇÃO: não salvou no servidor.\n\n'+window._ultimoErroSalvamento);
+}
+async function excluirContaReceber(id){
+  const cr=contasReceber.find(x=>x.id===id); if(!cr)return;
+  if(!confirm('Excluir esta conta a receber definitivamente? Se já foi recebida, a entrada no Financeiro NÃO é removida (o dinheiro entrou de verdade).'))return;
+  try{
+    contasReceber=contasReceber.filter(x=>x.id!==id);
+    renderContasReceber(); atualizarDashboard();
+    const ok=await salvarAgora();
+    if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
+  }catch(e){ console.error(e); alert('ERRO: '+(e&&e.message?e.message:e)); }
+}
+
 function renderPainelGeral(){
   if(!document.getElementById('finPainel'))return;
   finance.forEach(statusAutomaticoConta);
@@ -2594,7 +2817,9 @@ function renderPainelGeral(){
   const saldoProjetado = saldoAtual - pagarMes;
 
   const listaF = _listaFiados();
-  const aReceber = listaF.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
+  const aReceberFiados = listaF.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-_totalPagoOS(o)),0);
+  const aReceberCR = contasReceber.filter(cr=>cr.status!=='Recebido'&&cr.status!=='Cancelado').reduce((s,cr)=>s+Number(cr.valor||0),0);
+  const aReceber = aReceberFiados + aReceberCR;
 
   setTxt('pgSaldoAtual', moeda(saldoAtual));
   setTxt('pgRecebidoMes', moeda(recebidoMes));
@@ -2680,6 +2905,7 @@ function renderPainelGeral(){
   // ---- Próximos recebimentos (parcelas de fiados) ----
   const proxReceb=[];
   listaF.forEach(o=>{ (o.parcelasAcordo||[]).filter(p=>!p.pago).forEach(p=>proxReceb.push({data:p.data, cliente:o.cliente, valor:p.valor})); });
+  contasReceber.filter(cr=>cr.status!=='Recebido'&&cr.status!=='Cancelado').forEach(cr=>proxReceb.push({data:cr.previsao, cliente:cr.cliente, valor:cr.valor}));
   proxReceb.sort((a,b)=>String(a.data).localeCompare(String(b.data)));
   document.getElementById('pgProximosRecebimentos').innerHTML = proxReceb.length ? '<table class="rec-table"><tbody>'+
     proxReceb.slice(0,6).map(r=>`<tr><td>${dataBR(r.data)}</td><td>${escapeHtml(r.cliente||'-')}</td><td style="text-align:right">${moeda(r.valor)}</td></tr>`).join('')+
