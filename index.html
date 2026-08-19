@@ -426,6 +426,7 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <p class="muted">Organizado em abas: resumo, pagamentos, entradas e saídas.</p>
     <div class="finance-tabs">
       <button class="activeTab" onclick="abrirFinanceiro('finPainel', this)">Painel Geral</button>
+      <button onclick="abrirFinanceiro('finFluxo', this)">Fluxo de Caixa</button>
       <button onclick="abrirFinanceiro('finResumo', this)">Resumo</button>
       <button onclick="abrirFinanceiro('finPagamentos', this)">Pagamentos</button>
       <button onclick="abrirFinanceiro('finReceber', this)">Contas a Receber</button>
@@ -494,7 +495,44 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     </div>
 
     <div style="text-align:center;margin-top:10px">
-      <button class="gray" onclick="abrirFinanceiro('finCalendario', document.querySelector('.finance-tabs button:nth-child(7)'))">Ver Calendário Financeiro completo →</button>
+      <button class="gray" onclick="abrirFinanceiro('finCalendario', document.querySelector('.finance-tabs button:nth-child(8)'))">Ver Calendário Financeiro completo →</button>
+    </div>
+  </div>
+
+  <div id="finFluxo" class="finance-subsection">
+    <div class="panel">
+      <div class="cp-topo">
+        <div>
+          <h3>Fluxo de Caixa Projetado</h3>
+          <p class="muted">Mostra, período a período, quanto você deve ter em caixa juntando o que está previsto entrar (recebimentos e fiados) e sair (contas a pagar). Serve pra prever com antecedência se algum dia o caixa fica no vermelho.</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+        <label style="font-size:13px;font-weight:700;color:#374151">Agrupar por:</label>
+        <select id="fluxoAgrupar" class="inline-input" style="max-width:140px" onchange="renderFluxoCaixa()">
+          <option value="dia">Dia</option>
+          <option value="semana">Semana</option>
+          <option value="mes" selected>Mês</option>
+        </select>
+        <label style="font-size:13px;font-weight:700;color:#374151">Saldo inicial hoje (R$):</label>
+        <input id="fluxoSaldoInicial" class="inline-input" type="number" step="0.01" style="max-width:140px" placeholder="Ex: saldo do banco" oninput="renderFluxoCaixa()">
+        <small class="muted">deixe em branco pra começar do zero</small>
+      </div>
+
+      <div class="os-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:14px">
+        <div class="os-card"><small class="muted">Total previsto a entrar</small><strong id="fxTotalEntrar" style="font-size:20px;color:#166534">R$ 0,00</strong></div>
+        <div class="os-card"><small class="muted">Total previsto a sair</small><strong id="fxTotalSair" style="font-size:20px;color:#991b1b">R$ 0,00</strong></div>
+        <div class="os-card"><small class="muted">Menor saldo projetado</small><strong id="fxMenorSaldo" style="font-size:20px">R$ 0,00</strong></div>
+      </div>
+
+      <div id="fxAlertaNegativo"></div>
+
+      <table class="finance-table">
+        <thead><tr><th>Período</th><th>Entradas previstas</th><th>Saídas previstas</th><th>Resultado</th><th>Saldo acumulado</th></tr></thead>
+        <tbody id="listaFluxoCaixa"></tbody>
+      </table>
+      <p class="muted" style="margin-top:10px;font-size:12px">Projeção baseada em: contas a pagar em aberto, lançamentos de fornecedor pendentes, fiados com parcela agendada e contas a receber previstas. Itens sem data não aparecem na projeção.</p>
     </div>
   </div>
 
@@ -1566,6 +1604,7 @@ function abrirFinanceiro(id,btn){
   renderPainelGeral();
   renderCategorias();
   renderContasReceber();
+  renderFluxoCaixa();
 }
 
 function atualizarDashboard(){
@@ -2834,6 +2873,106 @@ async function excluirContaReceber(id){
     const ok=await salvarAgora();
     if(!ok) alert('ATENÇÃO: não salvou no servidor (conexão). Tente de novo.\n\n'+window._ultimoErroSalvamento);
   }catch(e){ console.error(e); alert('ERRO: '+(e&&e.message?e.message:e)); }
+}
+
+/* ===== Fluxo de Caixa Projetado ===== */
+function _chaveFluxo(dataISO, agrupar){
+  if(agrupar==='dia') return dataISO;
+  if(agrupar==='mes') return dataISO.slice(0,7);
+  // semana: segunda-feira da semana daquela data
+  const d=new Date(dataISO+'T00:00:00');
+  const diaSemana=(d.getDay()+6)%7; // 0=segunda
+  d.setDate(d.getDate()-diaSemana);
+  return d.toISOString().slice(0,10);
+}
+function _rotuloFluxo(chave, agrupar){
+  if(agrupar==='dia') return dataBR(chave);
+  if(agrupar==='mes'){ const l=_mesLabelPt(chave); return l.charAt(0).toUpperCase()+l.slice(1); }
+  const ini=new Date(chave+'T00:00:00'); const fim=new Date(ini); fim.setDate(fim.getDate()+6);
+  return dataBR(chave)+' a '+dataBR(fim.toISOString().slice(0,10));
+}
+function renderFluxoCaixa(){
+  const cont=document.getElementById('listaFluxoCaixa');
+  if(!cont)return;
+  const agrupar=document.getElementById('fluxoAgrupar')?.value||'mes';
+  const saldoInicial=Number(document.getElementById('fluxoSaldoInicial')?.value||0);
+  const hoje=dataHojeISO();
+  const setTxt=(id,t)=>{const el=document.getElementById(id); if(el) el.innerText=t;};
+
+  // Coleta eventos futuros (>= hoje) com data definida
+  const eventos=[]; // {data, entrada, saida}
+  // Saídas previstas: contas a pagar em aberto
+  finance.forEach(c=>{
+    if(c.status==='Pago'||c.status==='Cancelada') return;
+    if(!c.data || c.data<hoje) return;
+    eventos.push({data:c.data, entrada:0, saida:Number(c.valor||0)});
+  });
+  // Saídas previstas: lançamentos de fornecedor pendentes
+  dividasFornecedores.forEach(l=>{
+    if(l.pago || !l.data || l.data<hoje) return;
+    eventos.push({data:l.data, entrada:0, saida:Number(l.valor||0)});
+  });
+  // Entradas previstas: parcelas de fiado ainda não pagas
+  _listaFiados().forEach(o=>{
+    (o.parcelasAcordo||[]).forEach(p=>{
+      if(p.pago || !p.data || p.data<hoje) return;
+      eventos.push({data:p.data, entrada:Number(p.valor||0), saida:0});
+    });
+  });
+  // Entradas previstas: contas a receber avulsas em aberto
+  contasReceber.forEach(cr=>{
+    if(cr.status==='Recebido'||cr.status==='Cancelado') return;
+    if(!cr.previsao || cr.previsao<hoje) return;
+    eventos.push({data:cr.previsao, entrada:Number(cr.valor||0), saida:0});
+  });
+
+  // Agrupa
+  const grupos={};
+  eventos.forEach(ev=>{
+    const k=_chaveFluxo(ev.data, agrupar);
+    if(!grupos[k]) grupos[k]={entrada:0, saida:0};
+    grupos[k].entrada+=ev.entrada;
+    grupos[k].saida+=ev.saida;
+  });
+  const chaves=Object.keys(grupos).sort();
+
+  const totalEntrar=eventos.reduce((s,e)=>s+e.entrada,0);
+  const totalSair=eventos.reduce((s,e)=>s+e.saida,0);
+  setTxt('fxTotalEntrar', moeda(totalEntrar));
+  setTxt('fxTotalSair', moeda(totalSair));
+
+  if(chaves.length===0){
+    cont.innerHTML='<tr><td colspan="5" class="muted">Nenhum evento futuro com data definida pra projetar. Cadastre vencimentos e previsões de recebimento pra ver o fluxo.</td></tr>';
+    setTxt('fxMenorSaldo', moeda(saldoInicial));
+    document.getElementById('fxAlertaNegativo').innerHTML='';
+    return;
+  }
+
+  let acumulado=saldoInicial;
+  let menorSaldo=saldoInicial;
+  let primeiroNegativo=null;
+  cont.innerHTML = chaves.map(k=>{
+    const g=grupos[k];
+    const resultado=g.entrada-g.saida;
+    acumulado+=resultado;
+    if(acumulado<menorSaldo) menorSaldo=acumulado;
+    if(acumulado<0 && !primeiroNegativo) primeiroNegativo=k;
+    const corAcum=acumulado<0?'#991b1b':'#166534';
+    return `<tr>
+      <td><strong>${_rotuloFluxo(k,agrupar)}</strong></td>
+      <td style="color:#166534">${g.entrada>0?moeda(g.entrada):'-'}</td>
+      <td style="color:#991b1b">${g.saida>0?moeda(g.saida):'-'}</td>
+      <td style="color:${resultado>=0?'#166534':'#991b1b'}">${moeda(resultado)}</td>
+      <td style="color:${corAcum};font-weight:800">${moeda(acumulado)}</td>
+    </tr>`;
+  }).join('');
+
+  setTxt('fxMenorSaldo', moeda(menorSaldo));
+  const elMenor=document.getElementById('fxMenorSaldo'); if(elMenor) elMenor.style.color = menorSaldo<0?'#991b1b':'#166534';
+
+  document.getElementById('fxAlertaNegativo').innerHTML = primeiroNegativo
+    ? `<div style="background:#fee2e2;color:#991b1b;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:700">⚠️ Atenção: pela projeção, o caixa fica negativo em <strong>${_rotuloFluxo(primeiroNegativo,agrupar)}</strong>. Vale antecipar recebimentos ou renegociar contas antes disso.</div>`
+    : `<div style="background:#dcfce7;color:#166534;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:700">✅ Pela projeção, o caixa se mantém positivo em todo o período.</div>`;
 }
 
 function renderPainelGeral(){
@@ -5505,4 +5644,3 @@ function atualizarResumoFinanceiro(filtro='todos'){
 </script>
 </body>
 </html>
-      
