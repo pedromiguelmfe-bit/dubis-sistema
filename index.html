@@ -155,8 +155,24 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 .os-card{background:#fff;border:1px solid #eef0f3;border-radius:18px;padding:18px;box-shadow:0 2px 10px rgba(17,24,39,.04);display:flex;flex-direction:column;gap:10px}
 .pg-clicavel{cursor:pointer;transition:box-shadow .15s,border-color .15s}
 .pg-clicavel:hover{box-shadow:0 6px 18px rgba(17,24,39,.10);border-color:#f59e0b}
-.pg-grupo-titulo{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.pg-grupo-titulo{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .pg-grupo-titulo h3{margin:0;font-size:16px}
+.pg-icone{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.pg-icone.laranja{background:#fff1e0;color:#c2660a}
+.pg-icone.verde{background:#dcfce7;color:#166534}
+.pg-icone.roxo{background:#ede9fe;color:#6d28d9}
+.pg-icone.azul{background:#dbeafe;color:#1d4ed8}
+.pg-icone.vermelho{background:#fee2e2;color:#991b1b}
+.pg-card{background:#fff;border:1px solid #eef0f3;border-radius:16px;padding:16px;box-shadow:0 2px 10px rgba(17,24,39,.04);cursor:pointer;transition:box-shadow .15s,border-color .15s;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.pg-card:hover{box-shadow:0 6px 18px rgba(17,24,39,.10);border-color:#f59e0b}
+.pg-card-rotulo{text-transform:uppercase;font-weight:800;font-size:11px;color:#9ca3af;letter-spacing:.03em}
+.pg-card-valor{font-size:21px;font-weight:800;margin:4px 0;color:#111827}
+.pg-card-desc{font-size:12px;color:#9ca3af}
+.pg-card-lado{display:flex;flex-direction:column;align-items:center;gap:6px}
+.pg-card-seta{color:#c4c9d1;font-size:16px}
+.pg-pdf-card{background:#fff;border:1px solid #eef0f3;border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:box-shadow .15s;box-shadow:0 2px 10px rgba(17,24,39,.04)}
+.pg-pdf-card:hover{box-shadow:0 6px 18px rgba(17,24,39,.10)}
+.pg-status-card{background:#fff;border-radius:16px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;border:1px solid #eef0f3;box-shadow:0 2px 10px rgba(17,24,39,.04)}
 .os-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .os-cliente-nome{font-size:16px;font-weight:800;color:#111827}
 .os-veiculo-linha{color:#6b7280;font-size:13px}
@@ -444,50 +460,90 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
 
   <div id="finPainel" class="finance-subsection active">
     <div class="panel" style="margin-top:0">
-      <div class="pg-grupo-titulo">
-        <h3>Contas a Pagar</h3>
-        <button class="gray" onclick="pgPdfContasAPagar()">PDF Relatório</button>
-      </div>
-      <div class="os-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="os-card pg-clicavel" onclick="pgAbrirContasAPagar('mes')"><small class="muted">MÊS</small><strong style="font-size:20px" id="pgCapMes">R$ 0,00</strong><small class="muted">Total pendente do mês</small></div>
-        <div class="os-card pg-clicavel" onclick="pgAbrirContasAPagar('semana')"><small class="muted">SEMANA</small><strong style="font-size:20px" id="pgCapSemana">R$ 0,00</strong><small class="muted">Total pendente da semana</small></div>
-        <div class="os-card pg-clicavel" onclick="pgAbrirContasAPagar('hoje')"><small class="muted">HOJE</small><strong style="font-size:20px" id="pgCapHoje">R$ 0,00</strong><small class="muted">Total que vence hoje</small></div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="pg-grupo-titulo">
-        <h3>Registro de Contas Recebidas</h3>
-        <button class="gray" onclick="pgPdfContasRecebidas()">PDF Relatório</button>
-      </div>
-      <div class="os-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="os-card pg-clicavel" onclick="pgAbrirContasRecebidas('mes')"><small class="muted">MÊS</small><strong style="font-size:20px;color:#166534" id="pgCrMes">R$ 0,00</strong><small class="muted">Somente valores recebidos</small></div>
-        <div class="os-card pg-clicavel" onclick="pgAbrirContasRecebidas('semana')"><small class="muted">SEMANA</small><strong style="font-size:20px;color:#166534" id="pgCrSemana">R$ 0,00</strong><small class="muted">Recebidos na semana</small></div>
-        <div class="os-card pg-clicavel" onclick="pgAbrirContasRecebidas('hoje')"><small class="muted">HOJE</small><strong style="font-size:20px;color:#166534" id="pgCrHoje">R$ 0,00</strong><small class="muted">Recebidos hoje</small></div>
+      <div class="pg-grupo-titulo"><div class="pg-icone laranja">📅</div><h3>Contas a Pagar</h3></div>
+      <div class="os-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="pg-card pg-clicavel" onclick="pgAbrirContasAPagar('mes')">
+          <div><div class="pg-card-rotulo">Mês</div><div class="pg-card-valor" id="pgCapMes">R$ 0,00</div><div class="pg-card-desc">Total pendente do mês</div></div>
+          <div class="pg-card-lado"><div class="pg-icone laranja">📅</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-card pg-clicavel" onclick="pgAbrirContasAPagar('semana')">
+          <div><div class="pg-card-rotulo">Semana</div><div class="pg-card-valor" id="pgCapSemana">R$ 0,00</div><div class="pg-card-desc">Total pendente da semana</div></div>
+          <div class="pg-card-lado"><div class="pg-icone laranja">🗓️</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-card pg-clicavel" onclick="pgAbrirContasAPagar('hoje')">
+          <div><div class="pg-card-rotulo">Hoje</div><div class="pg-card-valor" id="pgCapHoje">R$ 0,00</div><div class="pg-card-desc">Total que vence hoje</div></div>
+          <div class="pg-card-lado"><div class="pg-icone laranja">✅</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-pdf-card" onclick="pgPdfContasAPagar()">
+          <div class="pg-icone laranja">🧾</div>
+          <div><div class="pg-card-rotulo">PDF Relatório</div><strong style="font-size:14px">Gerar relatório</strong><div class="pg-card-desc">Contas a pagar</div></div>
+        </div>
       </div>
     </div>
 
     <div class="panel">
-      <div class="pg-grupo-titulo">
-        <h3>Controle de Contas</h3>
-        <button class="gray" onclick="pgPdfControle()">PDF Relatório</button>
-      </div>
-      <div class="os-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="os-card pg-clicavel" onclick="pgAbrirControle('pagas')"><small class="muted">PAGAS</small><strong style="font-size:20px;color:#166534" id="pgCcPagas">R$ 0,00</strong><small class="muted">Contas efetivamente pagas (mês)</small></div>
-        <div class="os-card pg-clicavel" onclick="pgAbrirControle('vencidas')"><small class="muted">VENCIDAS</small><strong style="font-size:20px;color:#991b1b" id="pgCcVencidas">R$ 0,00</strong><small class="muted">Pendentes com data vencida</small></div>
-        <div class="os-card pg-clicavel" onclick="pgAbrirControle('avencer')"><small class="muted">A VENCER</small><strong style="font-size:20px" id="pgCcAVencer">R$ 0,00</strong><small class="muted">Pendentes futuras</small></div>
+      <div class="pg-grupo-titulo"><div class="pg-icone verde">💰</div><h3>Registro de Contas Recebidas</h3></div>
+      <div class="os-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="pg-card pg-clicavel" onclick="pgAbrirContasRecebidas('mes')">
+          <div><div class="pg-card-rotulo">Mês</div><div class="pg-card-valor" style="color:#166534" id="pgCrMes">R$ 0,00</div><div class="pg-card-desc">Somente valores recebidos</div></div>
+          <div class="pg-card-lado"><div class="pg-icone verde">🛍️</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-card pg-clicavel" onclick="pgAbrirContasRecebidas('semana')">
+          <div><div class="pg-card-rotulo">Semana</div><div class="pg-card-valor" style="color:#166534" id="pgCrSemana">R$ 0,00</div><div class="pg-card-desc">Recebidos na semana</div></div>
+          <div class="pg-card-lado"><div class="pg-icone verde">📅</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-card pg-clicavel" onclick="pgAbrirContasRecebidas('hoje')">
+          <div><div class="pg-card-rotulo">Hoje</div><div class="pg-card-valor" style="color:#166534" id="pgCrHoje">R$ 0,00</div><div class="pg-card-desc">Recebidos hoje</div></div>
+          <div class="pg-card-lado"><div class="pg-icone verde">✅</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-pdf-card" onclick="pgPdfContasRecebidas()">
+          <div class="pg-icone verde">🧾</div>
+          <div><div class="pg-card-rotulo">PDF Relatório</div><strong style="font-size:14px">Gerar relatório</strong><div class="pg-card-desc">Contas recebidas</div></div>
+        </div>
       </div>
     </div>
 
     <div class="panel">
-      <div class="pg-grupo-titulo">
-        <h3>Renda / Resultado das Ordens de Serviço</h3>
-        <button class="gray" onclick="pgPdfRenda()">PDF Relatório por veículo/OS</button>
+      <div class="pg-grupo-titulo"><div class="pg-icone roxo">🔄</div><h3>Controle de Contas</h3></div>
+      <div class="os-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="pg-card pg-clicavel" onclick="pgAbrirControle('pagas')">
+          <div><div class="pg-card-rotulo">Pagas</div><div class="pg-card-valor" style="color:#166534" id="pgCcPagas">R$ 0,00</div><div class="pg-card-desc">Contas efetivamente pagas (mês)</div></div>
+          <div class="pg-card-lado"><div class="pg-icone verde">✅</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-card pg-clicavel" onclick="pgAbrirControle('vencidas')">
+          <div><div class="pg-card-rotulo">Vencidas</div><div class="pg-card-valor" style="color:#991b1b" id="pgCcVencidas">R$ 0,00</div><div class="pg-card-desc">Pendentes com data vencida</div></div>
+          <div class="pg-card-lado"><div class="pg-icone vermelho">⚠️</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-card pg-clicavel" onclick="pgAbrirControle('avencer')">
+          <div><div class="pg-card-rotulo">A Vencer</div><div class="pg-card-valor" id="pgCcAVencer">R$ 0,00</div><div class="pg-card-desc">Pendentes futuras</div></div>
+          <div class="pg-card-lado"><div class="pg-icone laranja">🕐</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-pdf-card" onclick="pgPdfControle()">
+          <div class="pg-icone roxo">🧾</div>
+          <div><div class="pg-card-rotulo">PDF Relatório</div><strong style="font-size:14px">Gerar relatório</strong><div class="pg-card-desc">Controle de contas</div></div>
+        </div>
       </div>
-      <div class="os-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="os-card pg-clicavel" onclick="pgAbrirRenda()"><small class="muted">BRUTO</small><strong style="font-size:20px" id="pgRendaBruto">R$ 0,00</strong><small class="muted">Valor recebido das OS (mês)</small></div>
-        <div class="os-card pg-clicavel" onclick="pgAbrirRenda()"><small class="muted">LÍQUIDO</small><strong style="font-size:20px" id="pgRendaLiquido">R$ 0,00</strong><small class="muted">Resultado após custos registrados</small></div>
-        <div class="os-card pg-clicavel" onclick="pgAbrirRenda()"><small class="muted">MARGEM</small><strong style="font-size:20px" id="pgRendaMargem">0,0%</strong><small class="muted">Indicador complementar</small></div>
+    </div>
+
+    <div class="panel">
+      <div class="pg-grupo-titulo"><div class="pg-icone azul">💲</div><h3>Renda / Resultado das Ordens de Serviço</h3></div>
+      <div class="os-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="pg-card pg-clicavel" onclick="pgAbrirRenda()">
+          <div><div class="pg-card-rotulo">Bruto</div><div class="pg-card-valor" id="pgRendaBruto">R$ 0,00</div><div class="pg-card-desc">Valor recebido das OS (mês)</div></div>
+          <div class="pg-card-lado"><div class="pg-icone azul">📊</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-card pg-clicavel" onclick="pgAbrirRenda()">
+          <div><div class="pg-card-rotulo">Líquido</div><div class="pg-card-valor" id="pgRendaLiquido">R$ 0,00</div><div class="pg-card-desc">Resultado após custos registrados</div></div>
+          <div class="pg-card-lado"><div class="pg-icone azul">📈</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-card pg-clicavel" onclick="pgAbrirRenda()">
+          <div><div class="pg-card-rotulo">Margem</div><div class="pg-card-valor" id="pgRendaMargem">0,0%</div><div class="pg-card-desc">Indicador complementar</div></div>
+          <div class="pg-card-lado"><div class="pg-icone azul">🥧</div><span class="pg-card-seta">›</span></div>
+        </div>
+        <div class="pg-pdf-card" onclick="pgPdfRenda()">
+          <div class="pg-icone azul">🧾</div>
+          <div><div class="pg-card-rotulo">PDF Relatório</div><strong style="font-size:14px">Por veículo/OS</strong><div class="pg-card-desc">Renda das OS</div></div>
+        </div>
       </div>
     </div>
 
@@ -498,11 +554,18 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
       </div>
       <div class="panel" style="margin-top:0">
         <h4 style="margin-bottom:10px">Despesas por categoria (mês)</h4>
-        <div id="pgGraficoCategorias"></div>
+        <div id="pgGraficoCategorias" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap"></div>
       </div>
     </div>
 
+    <div class="os-grid" style="grid-template-columns:repeat(3,1fr);margin-top:16px">
+      <div class="pg-status-card" id="pgStatusVencidas"></div>
+      <div class="pg-status-card" id="pgStatusProximos"></div>
+      <div class="pg-status-card" id="pgStatusRecebimentos"></div>
+    </div>
+
     <div style="text-align:center;margin-top:10px">
+
       <button class="gray" onclick="abrirFinanceiro('finCalendario', [...document.querySelectorAll('.finance-tabs button')].find(b=>b.textContent.includes('Calendário Financeiro')))">Ver Calendário Financeiro completo →</button>
     </div>
   </div>
@@ -3140,6 +3203,21 @@ function _cardContasRecebidas(tipo){
   lista.sort((a,b)=>b.data.localeCompare(a.data));
   return {total:lista.reduce((s,x)=>s+x.valor,0), lista};
 }
+function _recebimentosPrevistosSemana(){
+  const {inicio,fim}=_semanaAtualInicioFim();
+  let total=0, qtd=0;
+  _listaFiados().forEach(o=>{
+    (o.parcelasAcordo||[]).forEach(p=>{
+      if(p.pago || !p.data) return;
+      if(p.data>=inicio && p.data<=fim){ total+=Number(p.valor||0); qtd++; }
+    });
+  });
+  contasReceber.forEach(cr=>{
+    if(cr.status==='Recebido'||cr.status==='Cancelado'||!cr.previsao) return;
+    if(cr.previsao>=inicio && cr.previsao<=fim){ total+=Number(cr.valor||0); qtd++; }
+  });
+  return {total, qtd};
+}
 function _cardPagas(){
   const mesAtual=mesAtualISO();
   const lista=saidas.filter(s=>(s.origem==='ContaPaga'||s.origem==='DividaFornecedor') && String(s.data||'').slice(0,7)===mesAtual)
@@ -3338,20 +3416,53 @@ function renderPainelGeral(){
     </div>`;
   }).join('') + '<div style="display:flex;gap:14px;margin-top:6px;font-size:11px"><span style="color:#16a34a">■ Entradas</span><span style="color:#ef4444">■ Saídas</span></div>';
 
-  // ---- Gráfico Despesas por categoria (mês) ----
+  // ---- Gráfico Despesas por categoria (mês) — donut ----
   const saidasMes = saidas.filter(s=>String(s.data||'').slice(0,7)===mesRef);
   const porCat={};
   saidasMes.forEach(s=>{ const c=(s.categoria||'Sem categoria').trim()||'Sem categoria'; porCat[c]=(porCat[c]||0)+Number(s.valor||0); });
   const cats=Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
   const totalCat=cats.reduce((s,c)=>s+c[1],0);
   const cores=['#f59e0b','#3b82f6','#16a34a','#ef4444','#8b5cf6','#ec4899','#14b8a6','#6b7280'];
-  document.getElementById('pgGraficoCategorias').innerHTML = cats.length ? cats.map((c,i)=>{
-    const pct=totalCat>0?Math.round((c[1]/totalCat)*100):0;
-    return `<div style="margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;font-size:12px"><span>${escapeHtml(c[0])}</span><strong>${moeda(c[1])} · ${pct}%</strong></div>
-      <div style="background:#f3f4f6;height:8px;border-radius:4px;overflow:hidden"><div style="background:${cores[i%cores.length]};height:100%;width:${pct}%"></div></div>
-    </div>`;
-  }).join('') : '<p class="muted">Nenhuma despesa registrada neste mês.</p>';
+  const elCat=document.getElementById('pgGraficoCategorias');
+  if(cats.length===0){
+    elCat.innerHTML='<p class="muted">Nenhuma despesa registrada neste mês.</p>';
+  } else {
+    const r=64, cx=80, cy=80, espessura=26, circ=2*Math.PI*r;
+    let acumulado=0;
+    const arcos = cats.map((c,i)=>{
+      const pct = totalCat>0 ? c[1]/totalCat : 0;
+      const comprimento = pct*circ;
+      const offset = -acumulado;
+      acumulado += comprimento;
+      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cores[i%cores.length]}" stroke-width="${espessura}" stroke-dasharray="${comprimento} ${circ-comprimento}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    }).join('');
+    const svg = `<svg viewBox="0 0 160 160" width="160" height="160" style="flex-shrink:0">
+      ${arcos}
+      <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="10" fill="#9ca3af">Total</text>
+      <text x="${cx}" y="${cy+13}" text-anchor="middle" font-size="13" font-weight="800" fill="#111827">${moeda(totalCat)}</text>
+    </svg>`;
+    const legenda = '<div style="flex:1;min-width:180px">' + cats.map((c,i)=>{
+      const pct=totalCat>0?((c[1]/totalCat)*100):0;
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px">
+        <span style="width:10px;height:10px;border-radius:3px;background:${cores[i%cores.length]};flex-shrink:0"></span>
+        <span style="flex:1">${escapeHtml(c[0])}</span>
+        <strong>${moeda(c[1])}</strong>
+        <span class="muted" style="min-width:42px;text-align:right">${pct.toFixed(1)}%</span>
+      </div>`;
+    }).join('') + '</div>';
+    elCat.innerHTML = svg + legenda;
+  }
+
+  // ---- Cartões de status (rodapé) ----
+  const vencidasInfo=_cardVencidas();
+  const capSemanaInfo=_cardContasAPagar('semana');
+  const recebPrevistos=_recebimentosPrevistosSemana();
+  const setHtml=(id,h)=>{const el=document.getElementById(id); if(el) el.innerHTML=h;};
+  setHtml('pgStatusVencidas', vencidasInfo.lista.length===0
+    ? `<div class="pg-icone verde">✅</div><div><strong>Tudo em dia!</strong><div class="muted" style="font-size:13px">Você não possui contas vencidas hoje.</div></div>`
+    : `<div class="pg-icone vermelho">⚠️</div><div><strong>Atenção!</strong><div class="muted" style="font-size:13px">Você tem ${vencidasInfo.lista.length} conta(s) vencida(s) somando ${moeda(vencidasInfo.total)}.</div></div>`);
+  setHtml('pgStatusProximos', `<div class="pg-icone laranja">📌</div><div><strong>Próximos vencimentos</strong><div class="muted" style="font-size:13px">Você tem ${capSemanaInfo.lista.length} conta(s) para vencer esta semana.</div></div>`);
+  setHtml('pgStatusRecebimentos', `<div class="pg-icone azul">ℹ️</div><div><strong>Recebimentos previstos</strong><div class="muted" style="font-size:13px">Você tem ${moeda(recebPrevistos.total)} para receber esta semana.</div></div>`);
 }
 function renderRelatorios(){
   if(!document.getElementById('relFluxoMensal'))return;
