@@ -1469,6 +1469,26 @@ async function enviarParaSupabase(){
   const dados=_coletarDados();
   _salvarBackupLocal(dados, ts);
   try{
+    // TRAVA DE SEGURANÇA CONTRA PERDA DE DADOS ENTRE APARELHOS:
+    // antes de gravar, confere se o servidor já tem algo mais novo do que esta aba
+    // conhece. Se tiver, significa que outra pessoa (ou outro computador) salvou
+    // enquanto esta aba estava aberta com dados velhos. Nesse caso NÃO grava, senão
+    // o trabalho da outra pessoa seria apagado. Apenas avisa e pede pra atualizar.
+    // (Não recarrega sozinho de propósito: recarregar automaticamente descartaria o
+    // que o usuário acabou de digitar nesta aba.)
+    const { data: atual, error: erroCheck } = await sb.from('estado_sistema')
+      .select('atualizado_em').eq('id', ESTADO_ID).maybeSingle();
+    if(!erroCheck && atual && atual.atualizado_em){
+      const tsRemoto = Date.parse(atual.atualizado_em)||0;
+      const tsConhecido = window._ultimoTsConhecido||0;
+      if(tsRemoto > tsConhecido + 1000){
+        mostrarStatus('err');
+        window._ultimoErroSalvamento = 'Outro computador salvou dados mais recentes.';
+        alert('ATENÇÃO — este lançamento NÃO foi salvo.\n\nOutro computador (ou outra aba) salvou informações mais recentes no sistema enquanto esta tela estava aberta com dados antigos.\n\nPara não apagar o trabalho da outra pessoa, o sistema bloqueou a gravação.\n\nO QUE FAZER: atualize a página (F5), confira o que já está lá e refaça este lançamento.');
+        return false;
+      }
+    }
+
     const { data, error } = await sb.from('estado_sistema')
       .upsert({ id: ESTADO_ID, dados, atualizado_em: new Date(ts).toISOString() })
       .select();
@@ -1510,14 +1530,12 @@ function diasEntre(dataISO){
 function limparOrcamentosAntigos(){
   // Nunca apaga orçamentos que já viraram OS ou foram concluídos — só descarta rascunhos
   // ("Aberto") abandonados há mais de 60 dias, que nunca foram aprovados nem finalizados.
-  const antes = quotes.length;
   quotes = quotes.filter(q => q.status!=='Aberto' || diasEntre(q.createdAt) <= 60);
-  // ATENÇÃO: NÃO salvar aqui. Esta função roda a cada carregamento da página (dentro de
-  // renderTudo). Se ela gravasse, toda vez que alguém abrisse o sistema o estado da
-  // memória seria escrito por cima do servidor — apagando o que outra pessoa tivesse
-  // cadastrado enquanto essa aba estava aberta. A limpeza fica só na memória e será
-  // persistida junto com a próxima ação real do usuário.
-  if(antes!==quotes.length) _temPendencia = true;
+  // ATENÇÃO: NÃO salvar nem marcar pendência aqui. Esta função roda a cada carregamento
+  // da página (dentro de renderTudo). Se ela marcasse pendência, a aba ficaria "devendo
+  // um salvamento" pra sempre — e ao trocar de aba ou fechar o navegador, horas depois,
+  // ela mandaria pro servidor o estado velho que tem na memória, apagando o que outra
+  // pessoa cadastrou nesse meio tempo. A limpeza fica só na memória.
 }
 
 function statusAutomaticoConta(c){
