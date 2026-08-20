@@ -1510,8 +1510,14 @@ function diasEntre(dataISO){
 function limparOrcamentosAntigos(){
   // Nunca apaga orçamentos que já viraram OS ou foram concluídos — só descarta rascunhos
   // ("Aberto") abandonados há mais de 60 dias, que nunca foram aprovados nem finalizados.
+  const antes = quotes.length;
   quotes = quotes.filter(q => q.status!=='Aberto' || diasEntre(q.createdAt) <= 60);
-  salvarDados();
+  // ATENÇÃO: NÃO salvar aqui. Esta função roda a cada carregamento da página (dentro de
+  // renderTudo). Se ela gravasse, toda vez que alguém abrisse o sistema o estado da
+  // memória seria escrito por cima do servidor — apagando o que outra pessoa tivesse
+  // cadastrado enquanto essa aba estava aberta. A limpeza fica só na memória e será
+  // persistida junto com a próxima ação real do usuário.
+  if(antes!==quotes.length) _temPendencia = true;
 }
 
 function statusAutomaticoConta(c){
@@ -5191,7 +5197,12 @@ function renderFinanceiro(){
   renderEntradas();
   renderSaidas();
   atualizarResumoFinanceiro('todos');
-  salvarDados();
+  // ATENÇÃO: esta função apenas DESENHA a tela — ela nunca deve salvar.
+  // Havia um salvarDados() aqui que gravava todo o estado da memória no servidor
+  // só por abrir/atualizar o Financeiro. Se esta aba estivesse aberta há horas,
+  // ela sobrescrevia no servidor o que outra pessoa tivesse cadastrado nesse meio
+  // tempo (era a causa de orçamentos sumirem). Salvar é responsabilidade apenas
+  // das ações do usuário (cadastrar, editar, excluir, pagar...).
 }
 function abrirNovaConta(){
   document.getElementById('mcTitulo').innerText='Nova conta';
