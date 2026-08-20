@@ -267,7 +267,9 @@ th{font-size:12px;text-transform:uppercase;color:#6b7280}
     <div class="card" onclick="abrirPorId('financeiro')"><small>Contas pagas (mês)</small><h3 id="dashPagas">R$ 0,00</h3></div>
     <div class="card" onclick="abrirPorId('orcamentos')"><small>Orçamentos do dia</small><h3 id="dashOrcDia">0</h3></div>
     <div class="card" onclick="abrirPorId('orcamentos')"><small>Orçamentos em aberto</small><h3 id="dashOrcAberto">0</h3></div>
+    <div class="card" onclick="abrirPorId('orcamentos')"><small>Valor em orçamentos</small><h3 id="dashValorOrcamentos">R$ 0,00</h3></div>
     <div class="card" onclick="abrirPorId('os')"><small>OS em andamento</small><h3 id="dashOSAndamento">0</h3></div>
+    <div class="card" onclick="abrirPorId('os')"><small>Valor pré-aprovado (em OS)</small><h3 id="dashValorPreAprovado">R$ 0,00</h3></div>
     <div class="card" onclick="abrirFinanceiroEntradasHoje()"><small>Entradas do dia</small><h3 id="dashRendaDia">R$ 0,00</h3></div>
     <div class="card" onclick="abrirPorId('os')"><small>A receber</small><h3 id="dashReceber">R$ 0,00</h3></div>
     <div class="card" onclick="abrirPorId('financeiro')"><small>Lucro do mês</small><h3 id="dashLucroMes">R$ 0,00</h3></div>
@@ -1640,7 +1642,9 @@ function atualizarDashboard(){
 
   const orcamentosDia    = quotes.filter(q=>String(q.createdAt||'').slice(0,10)===hoje).length;
   const orcamentosAberto = quotes.filter(q=>q.status==='Aberto').length;
+  const valorOrcamentos  = quotes.filter(q=>q.status==='Aberto').reduce((s,q)=>s+Number(q.total||0),0);
   const osAndamento      = serviceOrders.length;
+  const valorPreAprovado = serviceOrders.reduce((s,o)=>s+Number(o.total||0),0);
 
   const entradasHoje = entradas.filter(e=>String(e.data||'').slice(0,10)===hoje);
   const rendaDia   = entradasHoje.reduce((s,e)=>s+Number(e.valor||0),0);
@@ -1654,7 +1658,9 @@ function atualizarDashboard(){
   set('dashPagas',     moeda(pagasMes));
   set('dashOrcDia',    orcamentosDia);
   set('dashOrcAberto', orcamentosAberto);
+  set('dashValorOrcamentos', moeda(valorOrcamentos));
   set('dashOSAndamento', osAndamento);
+  set('dashValorPreAprovado', moeda(valorPreAprovado));
   set('dashRendaDia',  moeda(rendaDia));
   set('dashReceber',   moeda(aReceber));
   set('dashLucroMes',  moeda(lucroMes));
